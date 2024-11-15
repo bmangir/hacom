@@ -2,39 +2,43 @@
 This file is for train the model and save it for future usage.
 TODO: Make this with Apache Airflow periodically
 """
-
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import joblib
+import json
 
-# Sample product data
-#products = [
-#    {"product_id": "P201", "product_name": "Wireless Earbuds", "category": "Electronics", "tags": ["wireless", "audio", "portable"]},
-#    {"product_id": "P250", "product_name": "Portable Power Bank", "category": "Electronics", "tags": ["portable", "charging", "battery"]},
-#    {"product_id": "P301", "product_name": "The Great Adventure", "category": "Books", "tags": ["fiction", "adventure", "novel"]}
-#]
+PRODUCT_DATA_PATH = "/Users/berkantmangir/Desktop/graduation_project/sample_data_for_training_ml/chatgpt_sample_data/chatgpt_product_data.json"
 
-#products = pd.read_json("/Users/berkantmangir/Desktop/sample_product_data.json")
-products = pd.read_json("/Users/berkantmangir/Desktop/graduation_project/sample_data_for_training_ml/chatgpt_product_data.json")
+# Load product data
+with open(PRODUCT_DATA_PATH, "r") as file:
+    product_data = json.load(file)
+product_df = pd.DataFrame(product_data)
 
-# Convert data to a DataFrame
-df_products = pd.DataFrame(products)
-
-# Create a content feature
-df_products['content'] = (
-        df_products['product_name'] + " " +
-        df_products['category'] + " " +
-        df_products['tags'].apply(lambda x: ' '.join(x)) + " " +  # Join tags within each list
-        df_products['brand'] + " " +
-        df_products['details'].apply(lambda x: ' '.join(str(v) for v in x.values()))
+# Combine product features into a single text field
+product_df["text_features"] = (
+        product_df["product_name"] + " " +
+        product_df["category"] + " " +
+        product_df["brand"] + " " +
+        product_df["price"].apply(str) + " " +  # Add price as a string
+        product_df["tags"].apply(lambda x: " ".join(x) if isinstance(x, list) else "") + " " +  # Tags as space-separated string
+        product_df["details"].apply(lambda x: " ".join(map(str, x.values())) if isinstance(x, dict) else "")
 )
 
-# Train TF-IDF vectorizer
-tfidf_vectorizer = TfidfVectorizer(stop_words='english', min_df=1, max_features=1000, ngram_range=(1, 2))
-tfidf_matrix = tfidf_vectorizer.fit_transform(df_products['content'])
+# Vectorize product features
+vectorizer = TfidfVectorizer(stop_words="english")
+tfidf_matrix = vectorizer.fit_transform(product_df["text_features"])
 
-# Save both the model (vectorizer) and product data
-joblib.dump(tfidf_vectorizer, 'tfidf_vectorizer_content_based.joblib')
-df_products.to_csv("products.csv", index=False)
-print("Model and data saved.")
+# Compute cosine similarity
+cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
+
+# Map product_id to index
+product_index = pd.Series(product_df.index, index=product_df["product_id"]).drop_duplicates()
+
+# Save the model components
+joblib.dump(vectorizer, "ml_model/tfidf_vectorizer.pkl")
+joblib.dump(cosine_sim, "ml_model/cosine_similarity_matrix.pkl")
+joblib.dump(product_index, "ml_model/product_index.pkl")
+joblib.dump(product_df, "ml_model/product_data.pkl")
+
+print("Model trained and saved successfully!")

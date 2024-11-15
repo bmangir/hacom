@@ -1,43 +1,113 @@
+import json
+import re
 from flask import Flask, request, jsonify, Blueprint
 import pandas as pd
 import joblib
 import csv
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.model_selection import train_test_split
+import numpy as np
+
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 content_based_blueprint = Blueprint("content_based", __name__)
 
-# Load the model and data once when the API starts
-tfidf_vectorizer = joblib.load('/Users/berkantmangir/Desktop/graduation_project/hacom/recommendations/content_based/tfidf_vectorizer_content_based.joblib')
-df_products = pd.read_csv("/Users/berkantmangir/Desktop/graduation_project/hacom/recommendations/content_based/products.csv")
-tfidf_matrix = tfidf_vectorizer.transform(df_products['content'])
+ORDER_DATA_PATH = "sample_data/chatgpt_orders_data.json"
+BROWSING_HISTORY_DATA_PATH = "sample_data/chatgpt_browsing_history_data.json"
+PRODUCT_REVIEWS_DATA_PATH = "sample_data/chatgpt_product_reviews_data.json"
+CLICK_STREAM_DATA_PATH = "sample_data/chatgpt_clickstream_data.json"
+
+# Load saved models
+vectorizer = joblib.load("ml_model/tfidf_vectorizer.pkl")
+cosine_sim = joblib.load("ml_model/cosine_similarity_matrix.pkl")
+product_index = joblib.load("ml_model/product_index.pkl")
+product_df = joblib.load("ml_model/product_data.pkl")
+
+# Load user interaction data
+with open(BROWSING_HISTORY_DATA_PATH, "r") as file:
+    browsing_history = json.load(file)
+with open(ORDER_DATA_PATH, "r") as file:
+    orders = json.load(file)
+with open(CLICK_STREAM_DATA_PATH, "r") as file:
+    clickstream = json.load(file)
+with open(PRODUCT_REVIEWS_DATA_PATH, "r") as file:
+    product_reviews = json.load(file)
+
+# Convert interactions to DataFrames
+browsing_df = pd.DataFrame(browsing_history)
+orders_df = pd.DataFrame(orders)
+clickstream_df = pd.DataFrame(clickstream)
+reviews_df = pd.DataFrame(product_reviews)
 
 
-@content_based_blueprint.route('/recommend/contentBased', methods=['POST'])
-def recommend():
-    data = request.get_json()
-    source_product_id = data.get("product_id")
-    user_id = data.get("user_id")
+def get_user_interacted_products(user_id):
+    interacted_products = pd.concat([
+        orders_df[orders_df["user_id"] == user_id]["product_id"],
+        reviews_df[reviews_df["user_id"] == user_id]["product_id"],
+        browsing_df[browsing_df["user_id"] == user_id]["product_id"],
+        clickstream_df[clickstream_df["user_id"] == user_id]["product_id"].apply(lambda x: x[1])
+    ]).unique()
+    return interacted_products
 
-    # Find the index of the source product
-    source_idx = df_products[df_products['product_id'] == source_product_id].index[0]
 
-    # Calculate cosine similarity for the source product
-    sim_scores = cosine_similarity(tfidf_matrix[source_idx], tfidf_matrix).flatten()
-    top_indices = sim_scores.argsort()[-6:][::-1][1:]  # Get top 5 recommendations, exclude itself
+def recommend_for_user(user_id, top_n=5):
+    interacted_products = get_user_interacted_products(user_id)
+    if len(interacted_products) == 0:
+        print(f"No interactions found for customer {user_id}.")
+        return pd.DataFrame()
 
-    similarity_threshold = 0.75
+    recommendations = pd.DataFrame()
+    all_sim_scores = []  # List to store the similarity scores with product_ids
 
-    # Format recommendations
-    recommendations = [
-        {
-            "user_id": user_id,
-            "source_product_id": source_product_id,
-            "source_product_name": df_products['product_name'][source_idx],
-            "recommended_product_id": df_products['product_id'][idx],
-            "recommended_product_name": df_products['product_name'][idx],
-            "similarity_score": round(sim_scores[idx], 2)
-        }
-        for idx in top_indices #if sim_scores[idx] >= similarity_threshold
-    ]
+    for product_id in interacted_products:
+        if product_id in product_index:
+            idx = product_index[product_id]
+            sim_scores = list(enumerate(cosine_sim[idx]))
+            sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+            sim_scores = sim_scores[1 : top_n + 1]  # Skip the first one (it will be the same product)
 
-    return jsonify({"Content_Based_Filtering": recommendations})
+            for score in sim_scores:
+                product_idx = score[0]
+                similarity = score[1]
+                recommendations = pd.concat([recommendations, product_df.iloc[product_idx][["product_id"]]])
+                all_sim_scores.append({"product_id": product_df.iloc[product_idx]["product_id"], "similarity_score": similarity})
+
+    recommendations = recommendations.drop_duplicates()
+
+    # Create a DataFrame for recommendations with similarity scores
+    recommendation_with_scores = pd.DataFrame(all_sim_scores)
+    recommendation_with_scores = recommendation_with_scores.drop_duplicates().reset_index(drop=True)
+
+    return recommendation_with_scores
+
+
+def recommend_popular_products(top_n=5):
+    # Return the top N most popular products (based on frequency or sales)
+    popular_products = product_df.head(top_n)  # Assuming the first rows are popular, you can replace this with a more sophisticated logic
+    recommendation_with_scores = pd.DataFrame({
+        "product_id": popular_products["product_id"],
+        "similarity_score": [1.0] * len(popular_products)  # Assigning max similarity to popular products
+    })
+    return recommendation_with_scores
+
+
+def extract_product_id_from_clickstream(row):
+    if "product_id" in row:
+        return row["product_id"]
+    elif "page_url" in row:
+        parts = re.split(r"[/?=&]", row["page_url"])
+        return parts[-1] if parts[-1].startswith("P") else None
+    return None
+
+if "product_id" not in clickstream_df.columns:
+    clickstream_df["product_id"] = clickstream_df.apply(extract_product_id_from_clickstream, axis=1)
+
+# Example usage for cross-validation
+if __name__ == "__main__":
+    user_id = int(input("Enter User ID: "))
+    recommended_products = recommend_for_user(user_id, top_n=5)
+    if not recommended_products.empty:
+        print("\nRecommended Products:")
+        print(recommended_products.sort_values(by=["similarity_score"], ascending=False))
