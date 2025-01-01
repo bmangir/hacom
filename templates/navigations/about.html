@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>About</title>
+  <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            min-height: 100vh;
+            background: url("{{ url_for('static', filename='images/background.jpg') }}") no-repeat;
+            background-size: cover;
+            background-position: center;
+            color: #fff;
+        }
+
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px 100px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 99;
+        }
+
+        .logo {
+            font-size: 4em;
+            color: #fff;
+            user-select: none;
+        }
+
+        .navigation a {
+            position: relative;
+            font-size: 1.1em;
+            color: #fff;
+            text-decoration: none;
+            font-weight: 500;
+            margin-left: 40px;
+        }
+
+        .navigation a::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            bottom: -6px;
+            width: 100%;
+            height: 3px;
+            background: #fff;
+            border-radius: 5px;
+            transform: scaleX(0);
+            transition: transform .5s;
+        }
+
+        .navigation a:hover::after {
+            transform: scaleX(1);
+        }
+
+        .navigation .btnLogin-popup {
+            width: 130px;
+            height: 50px;
+            background: transparent;
+            border: 2px solid #fff;
+            outline: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.1em;
+            color: #fff;
+            font-weight: 400;
+            margin-left: 40px;
+            transition: .5s;
+        }
+
+        .navigation .btnLogin-popup:hover {
+            background: #fff;
+            color: #162938;
+        }
+
+        .about-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 50px;
+            border-radius: 10px;
+            max-width: 800px;
+            text-align: center;
+            margin-top: 100px;
+            color: #fff;
+        }
+
+        .about-container h2 {
+            margin-bottom: 20px;
+            font-size: 2.5em;
+        }
+
+        .about-container p {
+            font-size: 1.1em;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+<header>
+  <h2 class="logo">HACOM</h2>
+  <nav class="navigation">
+    <a href="/home">Home</a>
+    <a href="/about">About</a>
+    <a href="/help">Help</a>
+    <a href="/contact">Contact</a>
+    <button class="btnLogin-popup" onclick="window.location.href='/login'">Login</button>
+  </nav>
+</header>
+
+<div class="about-container">
+  <h2>About Us</h2>
+  <p>
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer in augue neque. Praesent tincidunt arcu id
+    metus convallis, in sodales nisi interdum. Donec auctor elit nec tortor fringilla, at ultricies nulla feugiat.
+    Fusce congue enim id nisi volutpat, ac vestibulum metus gravida. Nullam id mauris a ex sollicitudin
+    vestibulum quis vel neque. Ut porta sem non enim auctor, quis pharetra est gravida.
+  </p>
+  <p>
+    Vivamus a ligula ut odio ultrices consectetur sit amet id nulla. Curabitur et quam eget purus suscipit egestas.
+    Suspendisse potenti. Nam pharetra nisi sed urna facilisis, sed efficitur risus sodales. In hac habitasse platea
+    dictumst. Proin tincidunt mi a orci lacinia pretium. Nunc viverra quam sed tortor consequat, vel vestibulum felis
+    pharetra.
+  </p>
+</div>
+
+</body>
+</html>

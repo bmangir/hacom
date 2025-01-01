@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Profile</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    body {
+      background-color: #f4f4f4;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 100px;
+    }
+
+    .container {
+      width: 80%;
+      max-width: 1200px;
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+    }
+
+    .main-content {
+      flex: 3;
+      margin-right: 20px;
+    }
+
+    .side-container {
+      flex: 1;
+      background-color: #fff;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      border-radius: 5px;
+      padding: 20px;
+    }
+
+    .search-bar {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .search-bar input {
+      padding: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      width: 60%;
+    }
+
+    .search-bar select {
+      padding: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      width: 30%;
+    }
+
+    .filter-buttons {
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .filter-buttons button {
+      padding: 10px 20px;
+      background-color: #00C4FF;
+      border: none;
+      border-radius: 5px;
+      color: #fff;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .filter-buttons button:hover {
+      background-color: #008FCC;
+    }
+
+    .orders-list {
+      margin-bottom: 40px;
+      padding: 20px;
+      background-color: #fff;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      border-radius: 5px;
+    }
+
+    .orders-list ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .orders-list ul li {
+      padding: 10px 0;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .orders-list ul li:last-child {
+      border-bottom: none;
+    }
+
+    .button-container {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 30px;
+    }
+
+    .button-container button {
+      padding: 10px 20px;
+      background-color: transparent;
+      border: 1px solid #00C4FF;
+      border-radius: 5px;
+      color: #00C4FF;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .button-container button:hover {
+      background-color: #00C4FF;
+      color: #fff;
+    }
+
+    /* Special For You section */
+    .special-for-you, .my-profile-container {
+      margin-top: 50px;
+      padding: 20px;
+      background-color: #fff;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      border-radius: 5px;
+    }
+
+    .special-for-you button, .my-profile-container button {
+      padding: 10px 20px;
+      background-color: transparent;
+      border: 1px solid #00C4FF;
+      border-radius: 5px;
+      color: #00C4FF;
+      cursor: pointer;
+      font-weight: 500;
+      margin: 5px 0;
+      width: 100%;
+      text-align: left;
+    }
+
+    .special-for-you button:hover, .my-profile-container button:hover {
+      background-color: #00C4FF;
+      color: #fff;
+    }
+
+    .highlight {
+      background-color: orange;
+      color: #fff;
+    }
+
+    /* Purchases Container */
+    .purchases-container {
+      margin-top: 10px;
+      padding: 20px;
+      background-color: #fff;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      border-radius: 5px;
+    }
+
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- Search and Filtering Bar -->
+    <div class="search-bar">
+      <input type="text" placeholder="Search orders...">
+      <select>
+        <option value="1-month">1 Month</option>
+        <option value="3-months">3 Months</option>
+        <option value="1-year">1 Year</option>
+      </select>
+    </div>
+
+    <!-- Filter Buttons (All, Delivered, Pending, Returned) -->
+    <div class="filter-buttons">
+      <button>All</button>
+      <button>Delivered</button>
+      <button>Pending</button>
+      <button>Returned</button>
+    </div>
+
+    <!-- Orders List -->
+    <div class="orders-list">
+      <ul>
+        <li>Order #1 - Product Name - Date</li>
+        <li>Order #2 - Product Name - Date</li>
+        <li>Order #3 - Product Name - Date</li>
+        <li>Order #4 - Product Name - Date</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- Side Container (Purchases, Special For You, My Profile) -->
+  <div class="side-container">
+    <!-- Purchases Container -->
+    <div class="purchases-container">
+      <h3>Purchases</h3>
+      <div class="button-container">
+        <button id="my-orders-btn" onclick="highlightButton('my-orders-btn')">My Orders</button>
+        <button id="my-reviews-btn" onclick="highlightButton('my-reviews-btn')">My Reviews</button>
+      </div>
+    </div>
+
+    <!-- Special For You Section -->
+    <div class="special-for-you">
+      <h3>Special For You</h3>
+      <button id="visited-before" onclick="highlightButton('visited-before')">Visited Before</button>
+      <button onclick="highlightButton('followed-merchants')">Followed Merchants</button>
+    </div>
+
+    <!-- My Profile Section -->
+    <div class="my-profile-container">
+      <h3>My Profile</h3>
+      <button id="personal-details-btn" onclick="highlightButton('personal-details-btn')">Personal Details</button>
+      <button onclick="highlightButton('address-info')">Address Info</button>
+    </div>
+  </div>
+</div>
+
+<script>
+    // Function to highlight the active button
+    function highlightButton(buttonId) {
+      const allButtons = document.querySelectorAll('button');
+      allButtons.forEach(button => button.classList.remove('highlight'));
+      document.getElementById(buttonId).classList.add('highlight');
+
+      // Navigate to the correct page if needed
+      if (buttonId === 'personal-details-btn') {
+        window.location.href = '/personal-details';
+      } else if (buttonId === 'my-reviews-btn') {
+        window.location.href = '/my-reviews';
+      } else if (buttonId == 'visited-before') {
+        window.location.href = '/my-visits';
+      } else if (buttonId == 'my-orders-btn') {
+        window.location.href = '/my-orders';
+      }
+
+    }
+  </script>
+
+</body>
+</html>
