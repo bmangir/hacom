@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Search Results - HACOM{% endblock %}
+
+{% block additional_styles %}
+.search-header {
+    margin-bottom: 30px;
+}
+
+.search-header h1 {
+    color: #162938;
+    font-size: 1.8em;
+    margin-bottom: 10px;
+}
+
+.search-header p {
+    color: #666;
+    font-size: 1.1em;
+}
+
+.search-results {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+    padding: 20px 0;
+}
+
+.product-card {
+    background: white;
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    transition: transform 0.3s;
+}
+
+.product-card:hover {
+    transform: translateY(-5px);
+}
+
+.product-card img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 5px;
+}
+
+.product-info {
+    margin-top: 15px;
+}
+
+.product-info h3 {
+    color: #162938;
+    font-size: 1.2em;
+    margin-bottom: 8px;
+}
+
+.product-info p {
+    color: #666;
+    margin: 5px 0;
+}
+
+.product-price {
+    color: #00C4FF;
+    font-size: 1.2em;
+    font-weight: bold;
+    margin: 10px 0;
+}
+
+.product-category {
+    display: inline-block;
+    background: #f0f0f0;
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-size: 0.9em;
+    color: #666;
+    margin-top: 5px;
+}
+
+.no-results {
+    text-align: center;
+    padding: 50px;
+    color: #666;
+}
+
+.view-details-btn {
+    width: 100%;
+    padding: 8px;
+    background: #162938;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.view-details-btn:hover {
+    background: #2a3f54;
+}
+
+.product-rating {
+    margin: 10px 0;
+    color: #ffa41c;
+}
+
+.stars {
+    margin-right: 5px;
+}
+
+.rating-text {
+    color: #666;
+    font-size: 0.9em;
+}
+
+.fa-star {
+    margin-right: 2px;
+}
+{% endblock %}
+
+{% block content %}
+<div class="search-header">
+    <h1>Search Results</h1>
+    <p>Showing results for: "{{ query }}"</p>
+</div>
+
+{% if products %}
+<div class="search-results">
+    {% for product in products %}
+    <div class="product-card">
+        <img src="{{ product.image_url }}" alt="{{ product.name }}">
+        <div class="product-info">
+            <h3>{{ product.name }}</h3>
+            <p>{{ product.brand }}</p>
+            <p class="product-price">${{ "%.2f"|format(product.price) }}</p>
+            <span class="product-category">{{ product.category }}</span>
+            {% if product.rating %}
+            <div class="product-rating">
+                <span class="stars">
+                    {% for i in range(5) %}
+                        {% if i < product.rating|int %}
+                            <i class="fas fa-star"></i>
+                        {% else %}
+                            <i class="far fa-star"></i>
+                        {% endif %}
+                    {% endfor %}
+                </span>
+                <span class="rating-text">{{ "%.1f"|format(product.rating) }}/5</span>
+            </div>
+            {% endif %}
+            <button class="view-details-btn" onclick="window.location.href='/product/{{ product.id }}'">
+                View Details
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="no-results">
+    <h2>No products found</h2>
+    <p>Try searching with different keywords</p>
+</div>
+{% endif %}
+{% endblock %} 

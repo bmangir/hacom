@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Home - HACOM{% endblock %}
+
+{% block additional_styles %}
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.product-card {
+    background: white;
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.product-card img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 5px;
+}
+
+.product-info {
+    margin-top: 10px;
+}
+
+.product-price {
+    color: #00C4FF;
+    font-size: 1.2em;
+    font-weight: bold;
+    margin: 10px 0;
+}
+
+.category-section {
+    margin-bottom: 40px;
+}
+
+.category-section h2 {
+    color: #162938;
+    margin-bottom: 20px;
+}
+{% endblock %}
+
+{% block content %}
+<div class="category-section">
+    <h2>Recommended Products</h2>
+    <div class="product-grid">
+        {% for product in recommended_products %}
+        <div class="product-card">
+            <img src="{{ product.image_url }}" alt="{{ product.name }}">
+            <div class="product-info">
+                <h3>{{ product.name }}</h3>
+                <p>{{ product.brand }}</p>
+                <p class="product-price">${{ "%.2f"|format(product.price) }}</p>
+                <button onclick="window.location.href='/product/{{ product.id }}'">View Details</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="category-section">
+    <h2>Most Visited Categories</h2>
+    <div class="product-grid">
+        {% for category in most_visited_categories %}
+        <div class="category-card">
+            <h3>{{ category.name }}</h3>
+            <p>{{ category.visit_count }} visits</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

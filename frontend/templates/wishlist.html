@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Wishlist - HACOM{% endblock %}
+
+{% block additional_styles %}
+.wishlist-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+    padding: 20px 0;
+}
+
+/* Rest of the wishlist-specific styles... */
+{% endblock %}
+
+{% block content %}
+<h1>My Wishlist</h1>
+<!-- Rest of the wishlist content... -->
+{% endblock %} 

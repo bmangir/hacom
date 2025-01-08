@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}HACOM{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        /* Header styles */
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px 100px;
+            background: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 99;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .logo {
+            font-size: 2em;
+            color: #162938;
+            user-select: none;
+            text-decoration: none;
+        }
+
+        .navigation {
+            display: flex;
+            align-items: center;
+        }
+
+        .navigation a {
+            position: relative;
+            font-size: 1.1em;
+            color: #162938;
+            text-decoration: none;
+            font-weight: 500;
+            margin-left: 40px;
+        }
+
+        .search-container {
+            margin-right: 20px;
+        }
+
+        .search-container input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 5px;
+        }
+
+        .search-container button {
+            padding: 8px 15px;
+            background: #162938;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        /* Main content container */
+        .main-container {
+            margin-top: 100px;
+            padding: 20px;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Category Sidebar Styles */
+        .category-sidebar {
+            position: fixed;
+            left: -250px;
+            top: 0;
+            width: 250px;
+            height: 100%;
+            background: white;
+            transition: 0.5s;
+            padding-top: 100px;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            z-index: 101;
+            overflow-y: auto;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 110px;
+            right: 15px;
+            font-size: 20px;
+            cursor: pointer;
+            color: #162938;
+            transition: 0.3s;
+        }
+
+        .close-btn:hover {
+            color: #ff4444;
+        }
+
+        .category-sidebar.active {
+            left: 0;
+        }
+
+        .category-sidebar h3 {
+            color: #162938;
+            padding: 15px 25px;
+            font-size: 1.2em;
+            border-bottom: 1px solid #eee;
+            margin: 0;
+        }
+
+        .category-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .category-list li {
+            padding: 12px 25px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .category-list li:hover {
+            background: #f5f5f5;
+            padding-left: 30px;
+        }
+
+        .category-toggle {
+            position: fixed;
+            left: 20px;
+            top: 110px;
+            z-index: 98;
+            background: rgba(22, 41, 56, 0.8);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: 0.5s;
+        }
+
+        .category-toggle:hover {
+            background: rgba(22, 41, 56, 0.9);
+        }
+
+        /* Hide category toggle when sidebar is active */
+        .category-toggle.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Adjust main container for sidebar */
+        .main-container {
+            transition: 0.5s;
+        }
+
+        .main-container.shifted {
+            margin-left: 250px;
+        }
+
+        /* Category icon styles */
+        .category-icon {
+            margin-right: 15px;
+            width: 20px;
+            text-align: center;
+            color: #162938;
+        }
+
+        {% block additional_styles %}{% endblock %}
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/" class="logo">HACOM</a>
+        <nav class="navigation">
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Search products...">
+                <button onclick="performSearch()">Search</button>
+            </div>
+            {% if 'email' in session %}
+                <a href="/my-profile">Profile</a>
+                <a href="/cart">Cart</a>
+                <a href="/wishlist">Wishlist</a>
+                <a href="/logout">Logout</a>
+            {% else %}
+                <a href="/login">Login</a>
+                <a href="/register">Register</a>
+            {% endif %}
+        </nav>
+    </header>
+
+    <!-- Category Toggle Button -->
+    <button class="category-toggle" onclick="toggleCategories()">
+        <i class="fas fa-bars"></i> Categories
+    </button>
+
+    <!-- Category Sidebar -->
+    <div class="category-sidebar" id="categorySidebar">
+        <span class="close-btn" onclick="toggleCategories()">×</span>
+        <h3>All Categories</h3>
+        <ul class="category-list">
+            <li>
+                <i class="fas fa-laptop category-icon"></i>
+                Electronics
+            </li>
+            <li>
+                <i class="fas fa-tshirt category-icon"></i>
+                Fashion
+            </li>
+            <li>
+                <i class="fas fa-home category-icon"></i>
+                Home & Living
+            </li>
+            <li>
+                <i class="fas fa-book category-icon"></i>
+                Books
+            </li>
+            <li>
+                <i class="fas fa-basketball-ball category-icon"></i>
+                Sports & Outdoors
+            </li>
+            <li>
+                <i class="fas fa-spa category-icon"></i>
+                Beauty & Health
+            </li>
+            <li>
+                <i class="fas fa-gamepad category-icon"></i>
+                Toys & Games
+            </li>
+            <li>
+                <i class="fas fa-car category-icon"></i>
+                Automotive
+            </li>
+            <li>
+                <i class="fas fa-mobile-alt category-icon"></i>
+                Phones & Tablets
+            </li>
+            <li>
+                <i class="fas fa-camera category-icon"></i>
+                Cameras
+            </li>
+            <li>
+                <i class="fas fa-couch category-icon"></i>
+                Furniture
+            </li>
+            <li>
+                <i class="fas fa-utensils category-icon"></i>
+                Kitchen & Dining
+            </li>
+            <li>
+                <i class="fas fa-baby category-icon"></i>
+                Baby & Kids
+            </li>
+            <li>
+                <i class="fas fa-dumbbell category-icon"></i>
+                Fitness Equipment
+            </li>
+            <li>
+                <i class="fas fa-guitar category-icon"></i>
+                Musical Instruments
+            </li>
+            <li>
+                <i class="fas fa-paint-brush category-icon"></i>
+                Art & Craft Supplies
+            </li>
+        </ul>
+    </div>
+
+    <div class="main-container" id="mainContainer">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Footer Navigation -->
+    <footer class="footer-nav">
+        <div class="footer-links">
+            <a href="/about">About</a>
+            <a href="/help">Help</a>
+            <a href="/contact">Contact</a>
+        </div>
+    </footer>
+
+    <style>
+    .footer-nav {
+        background: #f8f9fa;
+        padding: 20px 0;
+        margin-top: 50px;
+        text-align: center;
+        box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+    }
+
+    .footer-links {
+        display: flex;
+        justify-content: center;
+        gap: 30px;
+    }
+
+    .footer-links a {
+        color: #162938;
+        text-decoration: none;
+        font-size: 1.1em;
+        transition: color 0.3s;
+    }
+
+    .footer-links a:hover {
+        color: #00C4FF;
+    }
+
+    /* Adjust main container to account for footer */
+    .main-container {
+        min-height: calc(100vh - 200px);
+        padding-bottom: 70px;
+    }
+    </style>
+
+    <script>
+        function performSearch() {
+            const searchQuery = document.getElementById('searchInput').value;
+            if (searchQuery.trim()) {
+                window.location.href = `/search?query=${encodeURIComponent(searchQuery)}`;
+            }
+        }
+
+        // Enter key trigger search
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+
+        // Category sidebar toggle functionality
+        function toggleCategories() {
+            const sidebar = document.getElementById('categorySidebar');
+            const mainContainer = document.getElementById('mainContainer');
+            const toggleButton = document.querySelector('.category-toggle');
+            sidebar.classList.toggle('active');
+            mainContainer.classList.toggle('shifted');
+            toggleButton.classList.toggle('hidden');
+        }
+
+        // Close sidebar when clicking outside
+        document.addEventListener('click', function(event) {
+            const sidebar = document.getElementById('categorySidebar');
+            const toggleButton = document.querySelector('.category-toggle');
+            const closeButton = document.querySelector('.close-btn');
+            
+            if (!sidebar.contains(event.target) && 
+                !toggleButton.contains(event.target) && 
+                !closeButton.contains(event.target) &&
+                sidebar.classList.contains('active')) {
+                sidebar.classList.remove('active');
+                document.getElementById('mainContainer').classList.remove('shifted');
+                toggleButton.classList.remove('hidden');
+            }
+        });
+
+        // Category click handler
+        document.querySelectorAll('.category-list li').forEach(item => {
+            item.addEventListener('click', function() {
+                const category = this.textContent.trim();
+                window.location.href = `/category/${encodeURIComponent(category)}`;
+            });
+        });
+    </script>
+    {% block additional_scripts %}{% endblock %}
+</body>
+</html> 
