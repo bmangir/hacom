@@ -7,8 +7,5 @@ bcrypt
 gunicorn
 flask-cors 
 certifi
-pickle
 pandas
 numpy
-json
-os
