@@ -1,19 +1,43 @@
 {% extends "base.html" %}
 
-{% block title %}Wishlist - HACOM{% endblock %}
-
-{% block additional_styles %}
-.wishlist-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 20px;
-    padding: 20px 0;
-}
-
-/* Rest of the wishlist-specific styles... */
-{% endblock %}
+{% block title %}My Wishlist - HACOM{% endblock %}
 
 {% block content %}
 <h1>My Wishlist</h1>
-<!-- Rest of the wishlist content... -->
-{% endblock %} 
+
+{% if wishlist_items %}
+    <ul>
+        {% for item in wishlist_items %}
+            <li>
+                <a href="/product/{{ item.id }}">
+                    <h2>{{ item.name }}</h2>
+                </a>
+                <p>Price: ${{ "%.2f"|format(item.price) }}</p>
+                <button onclick="removeFromWishlist('{{ item.id }}')">Remove</button>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>Your wishlist is empty.</p>
+{% endif %}
+{% endblock %}
+
+<script>
+function removeFromWishlist(productId) {
+    fetch(`/wishlist/remove/${productId}`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Product removed from wishlist successfully!');
+            location.reload(); // Reload the page to reflect changes
+        } else {
+            alert('Failed to remove product from wishlist: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+</script> 

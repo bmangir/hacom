@@ -1,4 +1,4 @@
-from databases.postgres.postgres_connector import PostgresConnector
+from databases.postgres.neon_postgres_connector import NeonPostgresConnector
 from flask import session
 
 class CartService:
@@ -8,12 +8,12 @@ class CartService:
         conn = None
         cursor = None
         try:
-            conn = PostgresConnector.get_connection()
+            conn = NeonPostgresConnector.get_connection()
             cursor = conn.cursor()
             
             # Check if product already exists in cart
             cursor.execute("""
-                SELECT cart_id, quantity 
+                SELECT quantity 
                 FROM cart 
                 WHERE user_id = %s AND product_id = %s AND action_type = 'added'
             """, (user_id, product_id))
@@ -22,16 +22,9 @@ class CartService:
             
             if existing_item:
                 # Update quantity of existing item
-                new_quantity = existing_item[1] + quantity
-                cursor.execute("""
-                    UPDATE cart 
-                    SET quantity = %s 
-                    WHERE cart_id = %s
-                    RETURNING cart_id
-                """, (new_quantity, existing_item[0]))
-            else:
-                # Insert new item
-                cursor.execute("""
+                new_quantity = existing_item[0] + quantity
+            
+            cursor.execute("""
                     INSERT INTO cart (user_id, product_id, action_type, quantity)
                     VALUES (%s, %s, 'added', %s)
                     RETURNING cart_id
@@ -50,7 +43,7 @@ class CartService:
             if cursor:
                 cursor.close()
             if conn:
-                PostgresConnector.return_connection(conn)
+                NeonPostgresConnector.return_connection(conn)
 
     @staticmethod
     def update_quantity(user_id, product_id, quantity):
@@ -58,7 +51,7 @@ class CartService:
         conn = None
         cursor = None
         try:
-            conn = PostgresConnector.get_connection()
+            conn = NeonPostgresConnector.get_connection()
             cursor = conn.cursor()
             
             # First mark existing item as removed
@@ -91,7 +84,7 @@ class CartService:
             if cursor:
                 cursor.close()
             if conn:
-                PostgresConnector.return_connection(conn)
+                NeonPostgresConnector.return_connection(conn)
 
     @staticmethod
     def get_cart_items(user_id):
@@ -99,7 +92,7 @@ class CartService:
         conn = None
         cursor = None
         try:
-            conn = PostgresConnector.get_connection()
+            conn = NeonPostgresConnector.get_connection()
             cursor = conn.cursor()
             
             cursor.execute("""
@@ -110,15 +103,18 @@ class CartService:
             """, (user_id,))
             
             items = cursor.fetchall()
-            return {"success": True, "items": items}
+            # Convert items to a list of dictionaries for easier processing
+            items_list = [{"cart_id": item[0], "product_id": item[1], "quantity": item[2], "action_date": item[3]} for item in items]
+            return {"success": True, "items": items_list}
             
         except Exception as e:
+            print(f"Error fetching cart items: {str(e)}")
             return {"success": False, "message": str(e)}
         finally:
             if cursor:
                 cursor.close()
             if conn:
-                PostgresConnector.return_connection(conn)
+                NeonPostgresConnector.return_connection(conn)
 
     @staticmethod
     def remove_from_cart(user_id, product_id):
@@ -126,7 +122,7 @@ class CartService:
         conn = None
         cursor = None
         try:
-            conn = PostgresConnector.get_connection()
+            conn = NeonPostgresConnector.get_connection()
             cursor = conn.cursor()
             
             # First get the current quantity
@@ -165,4 +161,4 @@ class CartService:
             if cursor:
                 cursor.close()
             if conn:
-                PostgresConnector.return_connection(conn) 
+                NeonPostgresConnector.return_connection(conn) 

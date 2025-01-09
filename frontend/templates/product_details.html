@@ -112,9 +112,53 @@
         <p class="stock-info">In Stock ({{ product.stock_quantity }} available)</p>
         <p class="product-category">{{ product.category }}</p>
         <div class="action-buttons">
-            <button class="add-to-cart" onclick="addToCart('{{ product.id }}')">Add to Cart</button>
-            <button class="add-to-wishlist" onclick="addToWishlist('{{ product.id }}')">Add to Wishlist</button>
+            <button class="add-to-cart" onclick="addToCart('{{ product.id }}', 1)">Add to Cart</button>
+            <button class="add-to-wishlist" id="wishlist-button" onclick="addToWishlist('{{ product.id }}')" {% if product.in_wishlist %}disabled{% endif %}>
+                {% if product.in_wishlist %}Already in Wishlist{% else %}Add to Wishlist{% endif %}
+            </button>
         </div>
     </div>
 </div>
+
+<script>
+function addToCart(productId, quantity) {
+    fetch(`/cart/add/${productId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ quantity: quantity })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Product added to cart successfully!');
+        } else {
+            alert('Failed to add product to cart: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+
+function addToWishlist(productId) {
+    fetch(`/wishlist/add/${productId}`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Product added to wishlist successfully!');
+            document.getElementById('wishlist-button').disabled = true;
+            document.getElementById('wishlist-button').innerText = 'Already in Wishlist';
+        } else {
+            alert('Failed to add product to wishlist: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+</script>
 {% endblock %} 

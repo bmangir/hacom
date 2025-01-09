@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from flask_jwt_extended import create_access_token
 from flask import current_app
 
-from databases.postgres.postgres_connector import PostgresConnector
+from databases.postgres.neon_postgres_connector import NeonPostgresConnector
 
 class AuthService:
     @staticmethod
@@ -13,7 +13,7 @@ class AuthService:
         cursor = None
         try:
             # Get database connection
-            conn = PostgresConnector.get_connection()
+            conn = NeonPostgresConnector.get_connection()
             if not conn:
                 return None, "Database connection failed"
                 
@@ -48,7 +48,7 @@ class AuthService:
             if cursor:
                 cursor.close()
             if conn:
-                PostgresConnector.return_connection(conn)
+                NeonPostgresConnector.return_connection(conn)
 
     @staticmethod
     def register(email, password, first_name, last_name):
@@ -56,7 +56,7 @@ class AuthService:
         cursor = None
         try:
             # Get database connection
-            conn = PostgresConnector.get_connection()
+            conn = NeonPostgresConnector.get_connection()
             if not conn:
                 return None, "Database connection failed"
                 
@@ -98,4 +98,4 @@ class AuthService:
             if cursor:
                 cursor.close()
             if conn:
-                PostgresConnector.return_connection(conn) 
+                NeonPostgresConnector.return_connection(conn) 

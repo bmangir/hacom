@@ -42,6 +42,7 @@ def profile():
     return render_template("user_profile.html")
 
 @main_controller_blueprint.route("/api/recommendations", methods=['GET'])
+@login_required
 def get_recommendations():
     user_id = session.get('user_id')
     if not user_id:

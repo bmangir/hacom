@@ -57,27 +57,40 @@ class RecommendationService:
         return similar_users
 
     def recommend_items(self, user_id, top_n=5):
-        """Recommend items to the given user based on similar users."""
+        """
+        Recommend items to the given user based on similar users.
+        
+        The recommendation system uses a hybrid approach:
+        1. First tries collaborative filtering based on user similarity
+        2. Falls back to popularity-based recommendations if no recommendations found
+        
+        Args:
+            user_id (str): The ID of the user to get recommendations for
+            top_n (int): Number of recommendations to return (default: 5)
+            
+        Returns:
+            list: List of recommended product dictionaries with details
+        """
         try:
-            user_id = "U11996"
+            # Find similar users using collaborative filtering
             similar_users = self.find_similar_users(user_id, top_n=5).index.tolist()
 
-            # Get products interacted by similar users
+            # Get products interacted by similar users from different sources
             similar_users_orders = self.orders_df[self.orders_df['user_id'].isin(similar_users)]
             similar_users_reviews = self.reviews_df[self.reviews_df['user_id'].isin(similar_users)]
             similar_users_browsing = self.browsing_df[self.browsing_df['user_id'].isin(similar_users)]
 
-            # Combine product interactions from orders, reviews, and browsing history
+            # Combine all product interactions to get a comprehensive view
             similar_users_products = pd.concat([
                 similar_users_orders[['product_id']],
                 similar_users_reviews[['product_id']],
                 similar_users_browsing[['product_id']]
             ])
 
-            # Get unique products interacted by similar users
+            # Get unique products to avoid duplicates
             similar_users_products = similar_users_products['product_id'].unique()
 
-            # Get products the target user has already interacted with
+            # Get products the target user has already interacted with to exclude them
             user_orders = self.orders_df[self.orders_df['user_id'] == user_id]['product_id'].tolist()
             user_reviews = self.reviews_df[self.reviews_df['user_id'] == user_id]['product_id'].tolist()
             user_browsing = self.browsing_df[self.browsing_df['user_id'] == user_id]['product_id'].tolist()
@@ -86,6 +99,10 @@ class RecommendationService:
 
             # Filter out products the user has already interacted with
             recommendations = [product for product in similar_users_products if product not in user_interacted_products]
+            
+            # If no recommendations found, fall back to popularity-based recommendations
+            if not recommendations:
+                recommendations = self._get_popular_products(user_interacted_products)
             
             # Get detailed information for recommended products
             recommended_products = []
@@ -107,6 +124,80 @@ class RecommendationService:
 
         except Exception as e:
             print(f"Error generating recommendations: {str(e)}")
+            return []
+
+    def _get_popular_products(self, excluded_products):
+        """
+        Get popular products based on order status and visit weights.
+        
+        This is a fallback recommendation system that uses a weighted scoring approach:
+        
+        Weights:
+        1. Order Status Weights (Total: 0.6 or 60%):
+           - Completed orders: 0.4 (40%) - Highest weight as these represent successful purchases
+           - Shipped orders: 0.1 (10%) - Lower weight as they're in progress
+           - Pending orders: 0.1 (10%) - Lower weight as they might not complete
+           
+        2. Visit Weight (0.4 or 40%):
+           - Product visits/views: 0.4 (40%) - High weight as it shows user interest
+           
+        The final score for each product is calculated as:
+        score = (completed_orders * 0.4) + (shipped_orders * 0.1) + 
+                (pending_orders * 0.1) + (visits * 0.4)
+        
+        Args:
+            excluded_products (set): Set of product IDs to exclude from recommendations
+            
+        Returns:
+            list: List of product IDs sorted by their popularity score
+        """
+        try:
+            # Define weights for different order statuses (total: 0.6 or 60%)
+            order_weights = {
+                'Delivered': 0.4,  # 40% weight for completed orders
+                'Shipped': 0.1,    # 10% weight for shipped orders
+                'Pending': 0.1     # 10% weight for pending orders
+            }
+            
+            # Initialize DataFrame for order-based scores
+            order_scores = pd.DataFrame()
+            
+            # Calculate weighted scores for each order status
+            for status, weight in order_weights.items():
+                status_orders = self.orders_df[self.orders_df['status'] == status]
+                status_counts = status_orders['product_id'].value_counts()
+                status_scores = status_counts * weight
+                
+                # Add scores to the DataFrame
+                if order_scores.empty:
+                    order_scores = pd.DataFrame(status_scores)
+                    order_scores.columns = ['score']
+                else:
+                    order_scores['score'] = order_scores['score'].add(status_scores, fill_value=0)
+            
+            # Calculate visit-based popularity (weight: 0.4 or 40%)
+            visit_counts = self.browsing_df['product_id'].value_counts()
+            visit_scores = visit_counts * 0.4
+            
+            # Combine order-based and visit-based scores
+            if order_scores.empty:
+                final_scores = pd.DataFrame(visit_scores)
+                final_scores.columns = ['score']
+            else:
+                final_scores = order_scores.copy()
+                final_scores['score'] = final_scores['score'].add(visit_scores, fill_value=0)
+            
+            # Sort by final score and exclude already interacted products
+            final_scores = final_scores.sort_values('score', ascending=False)
+            recommended_products = [
+                product_id for product_id in final_scores.index 
+                if product_id not in excluded_products
+            ]
+            
+            return recommended_products
+            
+        except Exception as e:
+            print(f"Error getting popular products: {str(e)}")
             return []
 
     def get_user_profile(self, user_id):

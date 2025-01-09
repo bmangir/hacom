@@ -2,20 +2,58 @@
 
 {% block title %}Shopping Cart - HACOM{% endblock %}
 
-{% block additional_styles %}
-.cart-item {
-    display: flex;
-    background: white;
-    margin-bottom: 20px;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-
-/* Rest of the cart-specific styles... */
-{% endblock %}
-
 {% block content %}
 <h1>Shopping Cart</h1>
-<!-- Rest of the cart content... -->
-{% endblock %} 
+
+{% if cart_items %}
+    <ul>
+        {% for item in cart_items %}
+            <li>
+                <a href="/product/{{ item.id }}">
+                    <h2>{{ item.name }}</h2>
+                </a>
+                <p>Price: ${{ "%.2f"|format(item.price) }}</p>
+                <p>Quantity: 
+                    <button onclick="updateQuantity('{{ item.id }}', -1)">-</button>
+                    <span id="quantity-{{ item.id }}">{{ item.quantity }}</span>
+                    <button onclick="updateQuantity('{{ item.id }}', 1)">+</button>
+                </p>
+            </li>
+        {% endfor %}
+    </ul>
+    <h3>Total: ${{ "%.2f"|format(total) }}</h3>
+{% else %}
+    <p>Your cart is empty.</p>
+{% endif %}
+{% endblock %}
+
+<script>
+function updateQuantity(productId, change) {
+    const quantityElement = document.getElementById(`quantity-${productId}`);
+    let currentQuantity = parseInt(quantityElement.innerText);
+    
+    // Update quantity based on the change
+    if (currentQuantity + change > 0) {
+        currentQuantity += change;
+        quantityElement.innerText = currentQuantity;
+
+        // Send the updated quantity to the backend
+        fetch(`/cart/update/${productId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ quantity: currentQuantity })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                alert('Failed to update quantity: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+    }
+}
+</script> 

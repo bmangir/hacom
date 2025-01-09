@@ -1,4 +1,4 @@
-from databases.postgres.postgres_connector import PostgresConnector
+from databases.postgres.neon_postgres_connector import NeonPostgresConnector
 
 class WishlistService:
     @staticmethod
@@ -7,7 +7,7 @@ class WishlistService:
         conn = None
         cursor = None
         try:
-            conn = PostgresConnector.get_connection()
+            conn = NeonPostgresConnector.get_connection()
             cursor = conn.cursor()
             
             # Check if product already exists in wishlist
@@ -40,7 +40,7 @@ class WishlistService:
             if cursor:
                 cursor.close()
             if conn:
-                PostgresConnector.return_connection(conn)
+                NeonPostgresConnector.return_connection(conn)
 
     @staticmethod
     def get_wishlist_items(user_id):
@@ -48,7 +48,7 @@ class WishlistService:
         conn = None
         cursor = None
         try:
-            conn = PostgresConnector.get_connection()
+            conn = NeonPostgresConnector.get_connection()
             cursor = conn.cursor()
             
             cursor.execute("""
@@ -59,7 +59,8 @@ class WishlistService:
             """, (user_id,))
             
             items = cursor.fetchall()
-            return {"success": True, "items": items}
+            items_list = [{"wishlist_id": item[0], "product_id": item[1], "action_date": item[2]} for item in items]
+            return {"success": True, "items": items_list}
             
         except Exception as e:
             return {"success": False, "message": str(e)}
@@ -67,7 +68,7 @@ class WishlistService:
             if cursor:
                 cursor.close()
             if conn:
-                PostgresConnector.return_connection(conn)
+                NeonPostgresConnector.return_connection(conn)
 
     @staticmethod
     def remove_from_wishlist(user_id, product_id):
@@ -75,7 +76,7 @@ class WishlistService:
         conn = None
         cursor = None
         try:
-            conn = PostgresConnector.get_connection()
+            conn = NeonPostgresConnector.get_connection()
             cursor = conn.cursor()
             
             # Insert a new 'removed' record
@@ -99,4 +100,30 @@ class WishlistService:
             if cursor:
                 cursor.close()
             if conn:
-                PostgresConnector.return_connection(conn) 
+                NeonPostgresConnector.return_connection(conn)
+
+    @staticmethod
+    def is_in_wishlist(user_id, product_id):
+        """Check if a product is already in the user's wishlist."""
+        conn = None
+        cursor = None
+        try:
+            conn = NeonPostgresConnector.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT wishlist_id 
+                FROM wishlist 
+                WHERE user_id = %s AND product_id = %s AND action_type = 'added'
+            """, (user_id, product_id))
+            
+            return cursor.fetchone() is not None
+            
+        except Exception as e:
+            print(f"Error checking wishlist: {str(e)}")
+            return False
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                NeonPostgresConnector.return_connection(conn) 

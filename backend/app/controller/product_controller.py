@@ -14,8 +14,10 @@ wishlist_service = WishlistService()
 def product_details(product_id):
     try:
         product = recommendation_service.get_product_details(product_id)
+        user_id = session.get('user_id')
+        in_wishlist = wishlist_service.is_in_wishlist(user_id, product_id)  # Check if in wishlist
         if product:
-            return render_template("product_details.html", product=product)
+            return render_template("product_details.html", product=product, in_wishlist=in_wishlist)
         return "Product not found", 404
     except Exception as e:
         print(f"Error viewing product: {str(e)}")
@@ -66,7 +68,7 @@ def add_to_cart(product_id):
 def update_cart_quantity(product_id):
     try:
         user_id = session.get('user_id')
-        quantity = request.json.get('quantity', 1)
+        quantity = request.json.get('quantity', 1)  # Get the updated quantity from the request
         
         result = cart_service.update_quantity(user_id, product_id, quantity)
         return jsonify(result)
@@ -88,17 +90,22 @@ def remove_from_cart(product_id):
 def view_cart():
     try:
         user_id = session.get('user_id')
-        cart_items = cart_service.get_cart_items(user_id)
+        cart_response = cart_service.get_cart_items(user_id)
         
+        if not cart_response['success']:
+            return "Error loading cart", 500
+        
+        cart_items = cart_response['items']
         products = []
         total = 0
+        
         for item in cart_items:
             product = recommendation_service.get_product_details(item['product_id'])
             if product:
                 product['quantity'] = item['quantity']
                 total += product['price'] * item['quantity']
                 products.append(product)
-                
+        
         return render_template("cart.html", cart_items=products, total=total)
     except Exception as e:
         print(f"Error viewing cart: {str(e)}")
@@ -118,8 +125,10 @@ def add_to_wishlist(product_id):
 @login_required
 def remove_from_wishlist(product_id):
     try:
+        print("HELLO WORLD")
         user_id = session.get('user_id')
         result = wishlist_service.remove_from_wishlist(user_id, product_id)
+        print(result)
         return jsonify(result)
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
@@ -129,8 +138,12 @@ def remove_from_wishlist(product_id):
 def view_wishlist():
     try:
         user_id = session.get('user_id')
-        wishlist_items = wishlist_service.get_wishlist_items(user_id)
+        wishlist_response = wishlist_service.get_wishlist_items(user_id)  # Get the wishlist items
         
+        if not wishlist_response['success']:
+            return "Error loading wishlist", 500
+        
+        wishlist_items = wishlist_response['items']  # Extract items from the response
         products = []
         for item in wishlist_items:
             product = recommendation_service.get_product_details(item['product_id'])

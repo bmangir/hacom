@@ -8,7 +8,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from databases.mongo.mongo_connector import MongoConnector
-from databases.postgres.postgres_connector import PostgresConnector
+from databases.postgres.neon_postgres_connector import NeonPostgresConnector
 from app.controller.user_controller import user_blueprint
 from app.controller.main_controller import main_controller_blueprint
 from app.controller.product_controller import product_controller_blueprint
@@ -32,7 +32,7 @@ app.register_blueprint(main_controller_blueprint)
 app.register_blueprint(product_controller_blueprint)
 
 # Initialize database connections
-PostgresConnector.initialize_connection_pool()
+NeonPostgresConnector.initialize_connection_pool()
 
 # Add route for serving static files
 @app.route('/static/<path:path>')
