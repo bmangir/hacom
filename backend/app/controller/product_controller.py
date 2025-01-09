@@ -1,8 +1,8 @@
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for
-from app.controller import login_required
-from app.service.recommendation_service import RecommendationService
-from app.service.cart_service import CartService
-from app.service.wishlist_service import WishlistService
+from ..controller import login_required
+from ..service.recommendation_service import RecommendationService
+from ..service.cart_service import CartService
+from ..service.wishlist_service import WishlistService
 
 product_controller_blueprint = Blueprint('product_controller_blueprint', __name__)
 recommendation_service = RecommendationService()

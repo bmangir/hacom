@@ -1,7 +1,7 @@
 from flask import request, Blueprint, jsonify, session, render_template, redirect, url_for
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from app.service.auth_service import AuthService
+from ..service.auth_service import AuthService
 
 user_blueprint = Blueprint('user_blueprint', __name__)
 

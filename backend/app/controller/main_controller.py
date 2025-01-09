@@ -1,6 +1,6 @@
 from flask import request, Blueprint, url_for, render_template, jsonify, session, redirect
-from app.controller import login_required
-from app.service.recommendation_service import RecommendationService
+from ..controller import login_required
+from ..service.recommendation_service import RecommendationService
 
 main_controller_blueprint = Blueprint('main_controller_blueprint', __name__)
 recommendation_service = RecommendationService()

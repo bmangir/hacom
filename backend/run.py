@@ -4,15 +4,15 @@ from datetime import timedelta
 import os
 import sys
 
-# Add parent directory to Python path to allow imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add the app directory to the Python path
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'app'))
 
 from databases.mongo.mongo_connector import MongoConnector
 from databases.postgres.neon_postgres_connector import NeonPostgresConnector
-from app.controller.user_controller import user_blueprint
-from app.controller.main_controller import main_controller_blueprint
-from app.controller.product_controller import product_controller_blueprint
-from config.config import JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES
+from .app.controller.user_controller import user_blueprint
+from .app.controller.main_controller import main_controller_blueprint
+from .app.controller.product_controller import product_controller_blueprint
+from .config.config import JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES
 
 app = Flask(__name__, 
            static_folder='../frontend/static',
