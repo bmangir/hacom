@@ -248,6 +248,21 @@ class RecommendationService:
         try:
             product_info = self.products_df[self.products_df['product_id'] == product_id].iloc[0]
             category = product_info['category']
+            
+            # Fetch reviews for the product
+            reviews = self.reviews_df[self.reviews_df['product_id'] == product_id].to_dict(orient='records')
+            
+            # Format reviews to include username and review text
+            formatted_reviews = []
+            for review in reviews:
+                formatted_reviews.append({
+                    'username': review['user_id'],  # Assuming user_id is used as username
+                    'comment': review['review_text'],
+                    'rating': review['rating'],
+                    'date': review['review_date'],
+                    'helpful_count': review['review_helpful_count']
+                })
+            
             return {
                 'id': product_info['product_id'],
                 'name': product_info['product_name'],
@@ -256,7 +271,8 @@ class RecommendationService:
                 'stock_quantity': int(product_info['stock_quantity']),
                 'brand': product_info['brand'],
                 'rating': float(product_info['rating']) if 'rating' in product_info else None,
-                'image_url': self._get_product_image(category)
+                'image_url': self._get_product_image(category),
+                'reviews': formatted_reviews  # Add formatted reviews to the returned product details
             }
         except Exception as e:
             print(f"Error getting product details: {str(e)}")
