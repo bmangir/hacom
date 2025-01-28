@@ -2,9 +2,214 @@
 
 {% block title %}My Profile - HACOM{% endblock %}
 
+{% block additional_styles %}
+.profile-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.profile-header {
+    margin-bottom: 30px;
+}
+
+.profile-header h1 {
+    color: #162938;
+    font-size: 2em;
+    margin-bottom: 10px;
+}
+
+.products-section {
+    margin-bottom: 40px;
+    position: relative;
+}
+
+.products-section h2 {
+    color: #162938;
+    margin-bottom: 20px;
+}
+
+.products-slider {
+    display: flex;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    padding: 20px 0;
+}
+
+.product-slide {
+    flex: 0 0 250px;
+    margin-right: 20px;
+    background: white;
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.product-slide img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 5px;
+}
+
+.product-info {
+    margin-top: 10px;
+    text-align: center;
+}
+
+.product-info h3 {
+    font-size: 1.1em;
+    color: #162938;
+    margin: 10px 0;
+}
+
+.product-price {
+    color: #00C4FF;
+    font-size: 1.2em;
+    font-weight: bold;
+    margin: 10px 0;
+}
+
+.slider-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(22, 41, 56, 0.8);
+    color: white;
+    border: none;
+    padding: 15px;
+    cursor: pointer;
+    border-radius: 50%;
+    z-index: 2;
+}
+
+.slider-arrow.left {
+    left: -20px;
+}
+
+.slider-arrow.right {
+    right: -20px;
+}
+
+.slider-arrow:hover {
+    background: rgba(22, 41, 56, 1);
+}
+
+.view-details-btn {
+    width: 100%;
+    padding: 8px;
+    background: #162938;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.view-details-btn:hover {
+    background: #2a3f54;
+}
+{% endblock %}
+
 {% block content %}
-<h1>My Profile</h1>
-<div class="profile-content">
-    <!-- Profile content -->
+<div class="profile-container">
+    <div class="profile-header">
+        <h1>My Profile</h1>
+    </div>
+
+    <!-- Recently Visited Products Section -->
+    <div class="products-section">
+        <h2>Recently Visited Products</h2>
+        {% if recent_products %}
+            <button class="slider-arrow left" onclick="slideProducts('left', 'recentSlider')" id="recentLeftArrow" style="display: none;">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="slider-arrow right" onclick="slideProducts('right', 'recentSlider')" id="recentRightArrow">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+            <div class="products-slider" id="recentSlider">
+                {% for product in recent_products %}
+                    <div class="product-slide">
+                        <img src="{{ product.image_url }}" alt="{{ product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                        <div class="product-info">
+                            <h3>{{ product.name }}</h3>
+                            <p class="product-price">${{ "%.2f"|format(product.price) }}</p>
+                            <button class="view-details-btn" onclick="window.location.href='/product/{{ product.id }}'">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>No recently visited products</p>
+        {% endif %}
+    </div>
+
+    <!-- Purchased Products Section -->
+    <div class="products-section">
+        <h2>Purchase History</h2>
+        {% if purchased_products %}
+            <button class="slider-arrow left" onclick="slideProducts('left', 'purchasedSlider')" id="purchasedLeftArrow" style="display: none;">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="slider-arrow right" onclick="slideProducts('right', 'purchasedSlider')" id="purchasedRightArrow">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+            <div class="products-slider" id="purchasedSlider">
+                {% for product in purchased_products %}
+                    <div class="product-slide">
+                        <img src="{{ product.image_url }}" alt="{{ product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                        <div class="product-info">
+                            <h3>{{ product.name }}</h3>
+                            <p class="product-price">${{ "%.2f"|format(product.price) }}</p>
+                            <button class="view-details-btn" onclick="window.location.href='/product/{{ product.id }}'">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>No purchase history</p>
+        {% endif %}
+    </div>
 </div>
+
+<script>
+function updateArrows(sliderId) {
+    const slider = document.getElementById(sliderId);
+    const leftArrow = document.getElementById(sliderId.replace('Slider', 'LeftArrow'));
+    const rightArrow = document.getElementById(sliderId.replace('Slider', 'RightArrow'));
+    
+    if (leftArrow) {
+        leftArrow.style.display = slider.scrollLeft > 0 ? 'block' : 'none';
+    }
+    
+    if (rightArrow) {
+        const remainingScroll = slider.scrollWidth - (slider.scrollLeft + slider.clientWidth);
+        rightArrow.style.display = remainingScroll > 0 ? 'block' : 'none';
+    }
+}
+
+function slideProducts(direction, sliderId) {
+    const slider = document.getElementById(sliderId);
+    const slideAmount = 270; // Width of slide + margin
+    
+    if (direction === 'left') {
+        slider.scrollLeft -= slideAmount;
+    } else {
+        slider.scrollLeft += slideAmount;
+    }
+    
+    // Update arrows after scrolling
+    setTimeout(() => updateArrows(sliderId), 100);
+}
+
+// Initialize arrows on load
+document.addEventListener('DOMContentLoaded', function() {
+    updateArrows('recentSlider');
+    updateArrows('purchasedSlider');
+});
+</script>
 {% endblock %}

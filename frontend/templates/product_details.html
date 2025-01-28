@@ -95,6 +95,128 @@
 .add-to-wishlist:hover {
     background: #e0e0e0;
 }
+
+.heart-button {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #ccc;
+    cursor: pointer;
+    transition: color 0.3s;
+    padding: 10px;
+}
+
+.heart-button.active {
+    color: #ff4444;
+}
+
+.merchant-info {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.merchant-info h3 {
+    color: #162938;
+    margin-bottom: 10px;
+}
+
+.merchant-link {
+    color: #00C4FF;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.merchant-link:hover {
+    text-decoration: underline;
+}
+
+.reviews-section {
+    margin-top: 40px;
+    padding: 20px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.review-item {
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.review-item:last-child {
+    border-bottom: none;
+}
+
+.review-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.review-rating {
+    color: #ffa41c;
+}
+
+.show-all-reviews {
+    display: block;
+    text-align: center;
+    padding: 10px;
+    margin-top: 20px;
+    background: #f8f9fa;
+    color: #162938;
+    text-decoration: none;
+    border-radius: 5px;
+    transition: background 0.3s;
+}
+
+.show-all-reviews:hover {
+    background: #e9ecef;
+}
+
+.similar-products {
+    margin-top: 40px;
+    position: relative;
+}
+
+.products-slider {
+    display: flex;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    padding: 20px 0;
+}
+
+.product-slide {
+    flex: 0 0 250px;
+    margin-right: 20px;
+}
+
+.slider-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(22, 41, 56, 0.8);
+    color: white;
+    border: none;
+    padding: 15px;
+    cursor: pointer;
+    border-radius: 50%;
+    z-index: 2;
+}
+
+.slider-arrow.left {
+    left: -20px;
+}
+
+.slider-arrow.right {
+    right: -20px;
+}
+
+.slider-arrow:hover {
+    background: rgba(22, 41, 56, 1);
+}
 {% endblock %}
 
 {% block content %}
@@ -111,10 +233,22 @@
         {% endif %}
         <p class="stock-info">In Stock ({{ product.stock_quantity }} available)</p>
         <p class="product-category">{{ product.category }}</p>
+        
+        <div class="merchant-info">
+            <h3>{{ product.merchant_id }}</h3>
+            <button 
+                class="merchant-button" 
+                onclick="window.location.href='/merchant/{{ product.merchant_id }}';">
+                {{ product.merchant_id }}
+            </button>
+        </div>
+        
         <div class="action-buttons">
             <button class="add-to-cart" onclick="addToCart('{{ product.id }}', 1)">Add to Cart</button>
-            <button class="add-to-wishlist" id="wishlist-button" onclick="addToWishlist('{{ product.id }}')" {% if product.in_wishlist %}disabled{% endif %}>
-                {% if product.in_wishlist %}Already in Wishlist{% else %}Add to Wishlist{% endif %}
+            <button class="heart-button {% if in_wishlist %}active{% endif %}" 
+                    onclick="toggleWishlist('{{ product.id }}')" 
+                    id="wishlist-button">
+                <i class="fas fa-heart"></i>
             </button>
         </div>
     </div>
@@ -124,22 +258,156 @@
 <div class="reviews-section">
     <h2>Customer Reviews</h2>
     {% if product.reviews %}
-        <ul>
-            {% for review in product.reviews %}
-                <li>
-                    <strong>User ID: {{ review.username }}</strong> (Rating: {{ review.rating }}/5)
+        <div class="reviews-list">
+            {% for review in product.reviews[:5] %}
+                <div class="review-item">
+                    <div class="review-header">
+                        <strong>{{ review.username }}</strong>
+                        <span class="review-rating">
+                            {% for i in range(5) %}
+                                <i class="fas fa-star {% if i < review.rating %}filled{% endif %}"></i>
+                            {% endfor %}
+                        </span>
+                    </div>
                     <p>{{ review.comment }}</p>
-                    <p><em>Reviewed on: {{ review.date }}</em></p>
-                    <p><em>Helpful Count: {{ review.helpful_count }}</em></p>
-                </li>
+                    <small>{{ review.date }}</small>
+                </div>
             {% endfor %}
-        </ul>
+        </div>
+        {% if product.reviews|length > 5 %}
+            <a href="/product/{{ product.id }}/reviews" class="show-all-reviews">
+                Show All Reviews ({{ product.reviews|length }})
+            </a>
+        {% endif %}
     {% else %}
         <p>No reviews available for this product.</p>
     {% endif %}
 </div>
 
+<!-- Similar Products Section -->
+<div class="similar-products">
+    <h2>Similar Products</h2>
+    {% if similar_products %}
+        {% if similar_products|length > 4 %}
+            <button class="slider-arrow left" onclick="slideProducts('left', 'similarSlider')" id="similarLeftArrow" style="display: none;">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="slider-arrow right" onclick="slideProducts('right', 'similarSlider')" id="similarRightArrow">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        {% endif %}
+        <div class="products-slider" id="similarSlider">
+            {% for similar_product in similar_products %}
+                <div class="product-slide">
+                    <div class="product-image">
+                        <img src="{{ similar_product.image_url }}" alt="{{ similar_product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                    </div>
+                    <div class="product-info">
+                        <h3>{{ similar_product.name }}</h3>
+                        <p class="product-price">${{ "%.2f"|format(similar_product.price) }}</p>
+                        <button onclick="window.location.href='/product/{{ similar_product.id }}'">
+                            View Details
+                        </button>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No similar products found</p>
+    {% endif %}
+</div>
+
+<!-- Category Products Section -->
+<div class="similar-products category-products">
+    <h2>More from {{ product.category }}</h2>
+    {% if category_products %}
+        {% if category_products|length > 4 %}
+            <button class="slider-arrow left" onclick="slideProducts('left', 'categorySlider')" id="categoryLeftArrow" style="display: none;">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="slider-arrow right" onclick="slideProducts('right', 'categorySlider')" id="categoryRightArrow">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        {% endif %}
+        <div class="products-slider" id="categorySlider">
+            {% for category_product in category_products %}
+                <div class="product-slide">
+                    <div class="product-image">
+                        <img src="{{ category_product.image_url }}" alt="{{ category_product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                    </div>
+                    <div class="product-info">
+                        <h3>{{ category_product.name }}</h3>
+                        <p class="product-price">${{ "%.2f"|format(category_product.price) }}</p>
+                        <button onclick="window.location.href='/product/{{ category_product.id }}'">
+                            View Details
+                        </button>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No additional products found in this category</p>
+    {% endif %}
+</div>
+
 <script>
+function toggleWishlist(productId) {
+    const button = document.getElementById('wishlist-button');
+    const isActive = button.classList.contains('active');
+    
+    const url = isActive ? `/wishlist/remove/${productId}` : `/wishlist/add/${productId}`;
+    
+    fetch(url, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            button.classList.toggle('active');
+        } else {
+            alert('Failed to update wishlist: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+
+function updateArrows(sliderId) {
+    const slider = document.getElementById(sliderId);
+    const leftArrow = document.getElementById(sliderId.replace('Slider', 'LeftArrow'));
+    const rightArrow = document.getElementById(sliderId.replace('Slider', 'RightArrow'));
+    
+    if (leftArrow) {
+        leftArrow.style.display = slider.scrollLeft > 0 ? 'block' : 'none';
+    }
+    
+    if (rightArrow) {
+        const remainingScroll = slider.scrollWidth - (slider.scrollLeft + slider.clientWidth);
+        rightArrow.style.display = remainingScroll > 0 ? 'block' : 'none';
+    }
+}
+
+function slideProducts(direction, sliderId) {
+    const slider = document.getElementById(sliderId);
+    const slideAmount = 270; // Width of slide + margin
+    
+    if (direction === 'left') {
+        slider.scrollLeft -= slideAmount;
+    } else {
+        slider.scrollLeft += slideAmount;
+    }
+    
+    // Update arrows after scrolling
+    setTimeout(() => updateArrows(sliderId), 100);
+}
+
+// Initialize arrows on load
+document.addEventListener('DOMContentLoaded', function() {
+    updateArrows('similarSlider');
+    updateArrows('categorySlider');
+});
+
 function addToCart(productId, quantity) {
     fetch(`/cart/add/${productId}`, {
         method: 'POST',
@@ -154,25 +422,6 @@ function addToCart(productId, quantity) {
             alert('Product added to cart successfully!');
         } else {
             alert('Failed to add product to cart: ' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-    });
-}
-
-function addToWishlist(productId) {
-    fetch(`/wishlist/add/${productId}`, {
-        method: 'POST'
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Product added to wishlist successfully!');
-            document.getElementById('wishlist-button').disabled = true;
-            document.getElementById('wishlist-button').innerText = 'Already in Wishlist';
-        } else {
-            alert('Failed to add product to wishlist: ' + data.message);
         }
     })
     .catch(error => {
