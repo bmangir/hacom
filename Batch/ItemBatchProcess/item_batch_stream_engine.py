@@ -1,9 +1,10 @@
+import json
 from datetime import datetime, timedelta
 
 from pymongo import UpdateOne
 from pyspark.sql import Window
 from pyspark.sql.functions import *
-from pyspark.sql.types import FloatType
+from pyspark.sql.types import FloatType, MapType, Row
 
 from config import MONGO_PRODUCTS_DB, client, ITEM_FEATURES_HOST, ITEM_CONTENTS_HOST
 from Batch.models import item_model as ItemModel
@@ -81,17 +82,96 @@ class ItemBatchService:
     def _get_basic_item_information(self):
         """Product Identification"""
 
-        basic_item_information = self.products_df.select("product_id", "product_name", "category", "brand", "price",
-                                                         "stock_quantity")
+        basic_item_information = self.products_df.select(
+            "product_id", "product_name", "category", "brand", "price",
+            "stock_quantity", "color", "material", "gender", "size",
+            "tags", "details", "format", "language"
+        )
         basic_item_information = basic_item_information.withColumn("price_bucket",
                                                                    when(col("price") <= 200, "Low")
-                                                                   .when((col("price") > 200) & (col("price") <= 1000),
-                                                                         "Medium")
+                                                                   .when((col("price") > 200) & (col("price") <= 1000), "Medium")
                                                                    .otherwise("High")) \
             .withColumn("stock_status",
                         when(col("stock_quantity") > 0, "in-stock").otherwise("out-stock"))
 
-        return basic_item_information
+        def build_metadata(
+                product_name, category, brand, price_bucket, stock_status,
+                color, material, gender, size, tags, details,
+                format, language
+        ):
+            print(f"Details Değeri: {details}, Tipi: {type(details)}")
+            metadata = {}
+
+            for key, val in {
+                "product_name": product_name,
+                "category": category,
+                "brand": brand,
+                "price_bucket": price_bucket,
+                "stock_status": stock_status,
+                "material": material,
+                "gender": gender,
+                "format": format,
+                "language": language
+            }.items():
+                if val:
+                    metadata[key] = str(val).lower()
+
+            for key, val in {
+                "color": color,
+                "size": size,
+                "tags": tags
+            }.items():
+                if val:
+                    if isinstance(val, list):
+                        metadata[key] = [str(v).lower() for v in val if v]
+                    else:
+                        metadata[key] = [str(val).lower()]
+
+            if details:
+                if isinstance(details, Row):
+                    for field in details.__fields__:
+                        value = details[field]
+                        if value:
+                            metadata[field.lower()] = str(value).lower() if isinstance(value, str) else value
+                elif isinstance(details, str): # JSON string kontrolü (opsiyonel, struct ise gerekmeyebilir)
+                    try:
+                        details_dict = json.loads(details)
+                        if isinstance(details_dict, dict):
+                            for k, v in details_dict.items():
+                                if v:
+                                    metadata[k.lower()] = str(v).lower() if isinstance(v, str) else v
+                    except json.JSONDecodeError:
+                        print(f"Uyarı: 'details' sütunu geçerli bir JSON stringi değil: {details}")
+
+            return metadata
+
+        metadata_udf = udf(build_metadata, MapType(StringType(), StringType()))
+
+        # metadata kolonu ekle
+        basic_item_information = basic_item_information.withColumn(
+            "metadata",
+            metadata_udf(
+                col("product_name"),
+                col("category"),
+                col("brand"),
+                col("price_bucket"),
+                col("stock_status"),
+                col("color"),
+                col("material"),
+                col("gender"),
+                col("size"),
+                col("tags"),
+                col("details"),
+                col("format"),
+                col("language")
+            )
+        )
+
+        a = basic_item_information.limit(1).toJSON().collect()
+        b = [json.loads(row) for row in a]
+        print(b[0])
+        return basic_item_information.select("product_id", "product_name", "category", "brand", "price",
+                                             "stock_quantity", "price_bucket", "stock_status", "metadata")
 
     def _get_content_based_attributes(self):
         """Textual and Visual Representations"""
@@ -103,7 +183,7 @@ class ItemBatchService:
             .withColumn("colors",
                         concat_ws(",", when(col("color").isNull(), lit([]))
                                   .otherwise(array_sort(col("color"))))) \
-            .withColumn("tags",
+            .withColumn("tag",
                         concat_ws(",", when(col("tags").isNull(), lit([]))
                                   .otherwise(array_sort(col("tags"))))) \
             .withColumn("sizes",
@@ -112,7 +192,7 @@ class ItemBatchService:
 
         df_flattened = contents_of_products.join(detailed_products_df, "product_id", "left").drop(
             contents_of_products.details)
-        df_flattened = df_flattened.select("product_id", "gender", "material", "colors", "tags", "sizes", "details",
+        df_flattened = df_flattened.select("product_id", "gender", "material", "colors", "tag", "sizes", "details",
                                            "language", "format")
 
         return df_flattened
@@ -291,20 +371,48 @@ class ItemBatchService:
             .withColumn("percentage_of_total", (col("total_units_sold") / total_sales) * 100) \
             .withColumnRenamed("order_product_id", "product_id")
 
+        #seasonal_sales_df = (
+        #    seasonal_sales_df
+        #    .groupBy("product_id")
+        #    .agg(
+        #        map_from_entries(
+        #            collect_list(
+        #                struct(
+        #                    col("season"),
+        #                    struct(
+        #                        col("total_units_sold").alias("total_sold_unit"),
+        #                        col("percentage_of_total")
+        #                    )
+        #                )
+        #            )
+        #        ).alias("seasonal_sales")
+        #    )
+        #)
+
+        default_seasonal_sales = create_map(
+            lit("Winter"), struct(lit(0).alias("total_sold_unit"), lit(0.0).alias("percentage_of_total")),
+            lit("Spring"), struct(lit(0).alias("total_sold_unit"), lit(0.0).alias("percentage_of_total")),
+            lit("Summer"), struct(lit(0).alias("total_sold_unit"), lit(0.0).alias("percentage_of_total")),
+            lit("Fall"), struct(lit(0).alias("total_sold_unit"), lit(0.0).alias("percentage_of_total"))
+        )
+
         seasonal_sales_df = (
             seasonal_sales_df
             .groupBy("product_id")
             .agg(
-                map_from_entries(
-                    collect_list(
-                        struct(
-                            col("season"),
+                coalesce(
+                    map_from_entries(
+                        collect_list(
                             struct(
-                                col("total_units_sold").alias("total_sold_unit"),
-                                col("percentage_of_total")
+                                col("season"),
+                                struct(
+                                    col("total_units_sold").alias("total_sold_unit"),
+                                    col("percentage_of_total")
+                                )
                             )
                         )
-                    )
+                    ),
+                    default_seasonal_sales
                 ).alias("seasonal_sales")
             )
         )
@@ -413,10 +521,19 @@ class ItemBatchService:
         return final_df
 
     def define_item_contents(self, basic_item_info_df, content_df):
-        item_content_df = basic_item_info_df.join(content_df, "product_id", "left")
-        item_content_df = _create_product_contents(item_content_df)
+        print(basic_item_info_df.columns)
+        print(content_df.columns)
+        basic_item_info_df.show(1)
+        content_df.show(1)
 
-        return item_content_df.select("product_id", "content")
+        item_content_df = basic_item_info_df.join(content_df, "product_id", "left")
+
+        item_content_df = _create_product_contents(item_content_df)
+        item_content_df.select("product_id", "content", "metadata").show(2)
+        b = item_content_df.toJSON().collect()
+        c = [json.loads(row) for row in b]
+        print(c[0])
+        return item_content_df.select("product_id", "content", "metadata")
 
     def define_item_profile(self):
         basic_item_information = self._get_basic_item_information()
@@ -430,9 +547,17 @@ class ItemBatchService:
         basic_item_information.cache()
         content_df.cache()
 
+        content_df.limit(1).show()
+        a = content_df.limit(1).collect()
+        print(a)
+
         item_content_df = self.define_item_contents(basic_item_information, content_df)
+        item_content_df.show(1)
+        a = item_content_df.limit(1).collect()
+        print(a)
+
         item_content_df = item_content_df.withColumn("agg_time", (unix_timestamp(current_timestamp()) * 1000))
-        distributed_content_df = distribution_of_df_by_range(item_content_df, range=5)
+        distributed_content_df = distribution_of_df_by_range(item_content_df, range=1)
 
         top_n_products_by_cat = top_n_products_by_cat.withColumn("agg_time",
                                                                  (unix_timestamp(current_timestamp()) * 1000))
@@ -452,11 +577,11 @@ class ItemBatchService:
         # Calculate vectors of contents and features
         feature_vector_df = self.vectorize_features(agg_features_df)
         content_vector_df = self.vectorize_contents(agg_contents_df)
+        content_vector_df.show(1)
 
         # Store the vectors in Pinecone, vector database
         start = datetime.now()
-        ItemModel.store_vectors(feature_vector_df, index_host=ITEM_FEATURES_HOST, index_name="item-features",
-                                dimension=787)
+        ItemModel.store_vectors(feature_vector_df, index_host=ITEM_FEATURES_HOST, index_name="item-features", dimension=787)
         mid = datetime.now()
         print(mid - start)
         ItemModel.store_vectors(content_vector_df, index_host=ITEM_CONTENTS_HOST, index_name="item-contents",
@@ -478,7 +603,7 @@ class ItemBatchService:
             .withColumn("values", vectorize_udf(col("content"))) \
             .withColumnRenamed("product_id", "id")
 
-        return vectorized_df.select("id", "values")
+        return vectorized_df.select("id", "values", "metadata")
 
     def vectorize_features(self, agg_features_df: DataFrame) -> DataFrame | None:
         if agg_features_df is None:
@@ -507,8 +632,8 @@ class ItemBatchService:
 
         # Store them in HDFS, store top_products to MongoDB
         ItemModel.store_agg_data_to_mongodb(top_products_based_cat_df, "top_n_products_by_category")
-        ItemModel.store_agg_data_to_mongodb(distributed_content_df.drop("product_num", "product_range"), "item_contents")
-        ItemModel.store_agg_data_to_mongodb(distributed_features_df.drop("product_num", "product_range"), "item_features")
+        ItemModel.store_agg_data_to_mongodb(distributed_content_df.drop("product_num", "product_range", "metadata"), "item_contents")
+        ItemModel.store_agg_data_to_mongodb(distributed_features_df.drop("product_num", "product_range", "metadata"), "item_features")
 
         self.start_vectorization(distributed_features_df, distributed_content_df)
 

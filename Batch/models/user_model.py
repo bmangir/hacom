@@ -32,10 +32,18 @@ def store_agg_data_to_mongodb(agg_df: DataFrame):
 def store_vectors(vectorized_df: DataFrame):
     print("Number of partitions: ", vectorized_df.rdd.getNumPartitions())
 
+    #store_to_pinecone(
+    #    vectors_df=vectorized_df,
+    #    host=USER_FEATURES_HOST,
+    #    index_name="user-features",
+    #    dimension=2324,
+    #    batch_size=600
+    #)
+
     store_to_pinecone(
         vectors_df=vectorized_df,
-        host=USER_FEATURES_HOST,
+        host="https://user-features-demo-8dq5u7b.svc.aped-4627-b74a.pinecone.io",
         index_name="user-features",
-        dimension=1556,
+        dimension=2324,
         batch_size=600
     )

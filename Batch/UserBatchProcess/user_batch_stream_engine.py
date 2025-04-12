@@ -110,11 +110,21 @@ class UserBatchService:
                                            "payment_method", "session_counts_last_30_days", "avg_session_duration_sec")
 
     def _get_browsing_behavior(self, ):
+        # Get last 30 days viewed products
+        last_30_days_views = self.browsing_df.filter(
+            col("browsing_timestamp") >= current_timestamp() - expr("INTERVAL 30 DAYS")
+        ).groupBy("user_id", "product_id").agg(
+            sum("view_duration").alias("view_duration"),
+            count("*").alias("view_count")
+        ).groupBy("user_id").agg(
+            collect_list("product_id").alias("recently_viewed_products"),
+            collect_list("view_duration").alias("recent_view_durations")
+        )
+
+        # Get total clicks
         total_clicks = self.browsing_df.filter(col("browsing_timestamp") >= current_timestamp() - expr("INTERVAL 30 DAYS")) \
             .groupBy("user_id") \
-            .agg(
-            count("*").alias("total_clicks")
-        )
+            .agg(count("*").alias("total_clicks"))
 
         # Perform left join to keep all users, and fill missing values with 0
         final_clicks_df = self.users_ids_df.join(total_clicks, "user_id", "left") \
@@ -186,12 +196,15 @@ class UserBatchService:
         final_df = products_df.join(categories_df, "user_id", "outer") \
             .join(overall_product_avg_df, "user_id", "outer") \
             .join(overall_category_avg_df, "user_id", "outer") \
+            .join(last_30_days_views, "user_id", "left") \
             .withColumn("products", coalesce(col("products"), array())) \
             .withColumn("avg_product_view_duration", coalesce(col("avg_product_view_duration"), array())) \
             .withColumn("overall_avg_product_view_duration", coalesce(col("overall_avg_product_view_duration"), lit(0.0))) \
             .withColumn("categories", coalesce(col("categories"), array())) \
             .withColumn("avg_category_view_duration", coalesce(col("avg_category_view_duration"), array())) \
             .withColumn("overall_avg_category_view_duration", coalesce(col("overall_avg_category_view_duration"), lit(0.0))) \
+            .withColumn("recently_viewed_products", coalesce(col("recently_viewed_products"), array())) \
+            .withColumn("recent_view_durations", coalesce(col("recent_view_durations"), array())) \
             .withColumn(
             "freq_views",
             struct(
@@ -200,7 +213,9 @@ class UserBatchService:
                 col("overall_avg_product_view_duration"),
                 col("categories"),
                 col("avg_category_view_duration"),
-                col("overall_avg_category_view_duration")
+                col("overall_avg_category_view_duration"),
+                col("recently_viewed_products"),
+                col("recent_view_durations")
             )
         ).select("user_id", "freq_views")
 
@@ -223,6 +238,19 @@ class UserBatchService:
         return browsing_df
 
     def _get_purchase_behavior(self, ):
+        # Get last 30 days purchased products
+        last_30_days_purchases = self.orders_df.filter(
+            col("order_date") >= int((datetime.now() - timedelta(days=30)).timestamp() * 1000)
+        ).groupBy("user_id", "order_product_id").agg(
+            count("*").alias("purchase_count"),
+            sum("total_amount").alias("total_amount")
+        ).groupBy("user_id").agg(
+            collect_list("order_product_id").alias("recently_purchased_products"),
+            collect_list("purchase_count").alias("recent_purchase_counts"),
+            collect_list("total_amount").alias("recent_purchase_amounts")
+        )
+        last_30_days_purchases = self.users_ids_df.join(last_30_days_purchases, "user_id", "left")
+
         total_purchases = self.orders_df.groupBy("user_id").agg(count_distinct("order_id").alias("total_purchase"))
         total_purchases = self.users_ids_df.join(total_purchases, "user_id", "left").fillna({"total_purchase": 0})
 
@@ -259,10 +287,11 @@ class UserBatchService:
             .agg(count("*").alias("orders_per_season"))
 
         # Calculate the average order frequency per season per user
-        avg_order_freq_seasonal = seasonal_orders.groupBy("user_id", "season") \
+        avg_order_freq_seasonal = seasonal_orders.groupBy("user_id") \
             .pivot("season", ["winter", "spring", "summer", "fall"]) \
             .agg(avg("orders_per_season").alias("avg_orders_per_season"))
         avg_order_freq_seasonal = avg_order_freq_seasonal.fillna(0)
+        print(avg_order_freq_seasonal.count())
 
         avg_order_freq_seasonal = avg_order_freq_seasonal.withColumn(
             "seasonal_data",
@@ -273,6 +302,7 @@ class UserBatchService:
                 when(col("fall").isNotNull(), col("fall")).otherwise(lit(0.0)).alias("fall")
             )
         ).select("user_id", "seasonal_data")
+        print(avg_order_freq_seasonal.count())
 
         avg_order_freq_seasonal = self.users_ids_df.join(avg_order_freq_seasonal, "user_id", "left")
         default_seasonal = struct(
@@ -286,11 +316,25 @@ class UserBatchService:
             coalesce(col("seasonal_data"), default_seasonal)
         )
 
+        avg_order_freq_seasonal.groupBy("user_id").count().filter("count > 1").show()
+        self.users_ids_df.groupBy("user_id").count().filter("count > 1").show()
+
+
+        print(avg_order_value.count())
+        print(total_spent.count())
+        print(avg_order_freq_monthly.count())
+        print(avg_order_freq_seasonal.count())
+        print(last_30_days_purchases.count())
+
         final_df = total_purchases \
             .join(avg_order_value, "user_id", "right") \
             .join(total_spent, "user_id", "right") \
             .join(avg_order_freq_monthly, "user_id", "right") \
-            .join(avg_order_freq_seasonal, "user_id", "right")
+            .join(avg_order_freq_seasonal, "user_id", "right") \
+            .join(last_30_days_purchases, "user_id", "right") \
+            .withColumn("recently_purchased_products", coalesce(col("recently_purchased_products"), array())) \
+            .withColumn("recent_purchase_counts", coalesce(col("recent_purchase_counts"), array())) \
+            .withColumn("recent_purchase_amounts", coalesce(col("recent_purchase_amounts"), array()))
 
         return final_df
 
@@ -378,17 +422,19 @@ class UserBatchService:
         product_preferences = self._get_product_preferences()
         ctr_df = self._get_ctr()
 
-        print(user_profile.rdd.getNumPartitions())
+        print(user_profile.count())
+        print(browsing_behavior.count())
+        print(purchase_behavior.count())
+        print(product_preferences.count())
+        print(ctr_df.count())
 
         transformed_df = transform_data(user_profile, browsing_behavior, purchase_behavior, product_preferences, ctr_df)
-        print(transformed_df.rdd.getNumPartitions())
-        distributed_df = distribution_of_df_by_range(transformed_df)
-        print(distributed_df.rdd.getNumPartitions())
+        distributed_df = distribution_of_df_by_range(transformed_df, 1)
+        print(distributed_df.count())
 
         return distributed_df
 
     def vectorize(self, agg_df: DataFrame) -> DataFrame | None:
-        print("Before vectorization:", agg_df.rdd.getNumPartitions())
         vectorize_udf = udf(vectorize, ArrayType(FloatType()))
 
         if agg_df is None:
@@ -404,14 +450,12 @@ class UserBatchService:
         return vectorized_df.withColumnRenamed("user_id", "id").select("id", "values")
 
     def start_vectorization(self, agg_df):
-        #agg_df = UserModel.fetch_data_from_hdfs(spark=reader_sj)  # Get df from hdfs
         vectorized_agg_df = self.vectorize(agg_df)  # Vectorize df
-        print(vectorized_agg_df.rdd.getNumPartitions())
-
         UserModel.store_vectors(vectorized_agg_df)
 
     def start(self):
         distributed_df = self.define_user_features().cache()
+        print(distributed_df.count())
 
         # Store data in Mongo and HDFS for further usages
         UserModel.store_agg_data_to_mongodb(distributed_df.drop("user_num", "user_range"))

@@ -18,7 +18,6 @@ scaler = MinMaxScaler()
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 bert_model = BertModel.from_pretrained('bert-base-uncased')
 
-# TODO: @udf can be problem of the error
 
 def analyze_sentiment(text):
     """Compute sentiment score using VADER"""
@@ -66,7 +65,9 @@ def vectorize_item_features(
         conversion_rate, abandonment_rate, avg_rating, trending_score,
         winter_sales, spring_sales, summer_sales, fall_sales,
         daily_units_sold, trend_7_day, trend_30_day,
-        last_1_day_sales, last_7_days_sales, last_30_days_sales, content
+        last_1_day_sales, last_7_days_sales, last_30_days_sales, content,
+        price_elasticity, competitor_analysis, content_quality_score,
+        inventory_turnover, return_rate, customer_satisfaction_score
 ):
 
     weights = {
@@ -79,7 +80,13 @@ def vectorize_item_features(
         "conversion_rate": 1.1,
         "abandonment_rate": 1.1,
         "trending_score": 1.4,
-        "default": 1.0
+        "default": 1.0,
+        "price_elasticity": 1.3,
+        "competitor_analysis": 1.2,
+        "content_quality": 1.5,
+        "inventory_turnover": 1.1,
+        "return_rate": 1.2,
+        "customer_satisfaction": 1.6
     }
 
     try:
@@ -106,7 +113,15 @@ def vectorize_item_features(
             safe_get(last_1_day_sales) * weights["latest_sales_summary"],
             safe_get(last_7_days_sales) * weights["latest_sales_summary"],
             safe_get(last_30_days_sales) * weights["latest_sales_summary"],
-            ]
+            
+            # New features
+            safe_get(price_elasticity) * weights["price_elasticity"],
+            safe_get(competitor_analysis) * weights["competitor_analysis"],
+            safe_get(content_quality_score) * weights["content_quality"],
+            safe_get(inventory_turnover) * weights["inventory_turnover"],
+            safe_get(return_rate) * weights["return_rate"],
+            safe_get(customer_satisfaction_score) * weights["customer_satisfaction"]
+        ]
 
         inputs = tokenizer(content, return_tensors="pt", truncation=True, padding=True, max_length=512)
         with torch.no_grad():
@@ -149,7 +164,7 @@ def _create_product_contents(df):
             " | ",
             concat(lit("Name:"), col("product_name")),
             concat(lit("Category:"), col("category")),
-            concat(lit("Tags:"), col("tags")),
+            concat(lit("Tags:"), col("tag")),
             when(col("brand").isNotNull(), concat_ws("", lit("Brand:"), col("brand"))),
             when(col("material").isNotNull(), concat_ws("", lit("Material:"), col("material"))),
             when(col("gender").isNotNull(), concat_ws("", lit("Gender:"), col("gender"))),

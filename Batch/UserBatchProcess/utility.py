@@ -15,16 +15,21 @@ def vectorize(ctr, user_profile, browsing_behavior, purchase_behavior, product_p
         "products": 2.0,
         "brands": 1.3,
         "user_profile": 1.1,
-        "seasonal": 0.8
+        "seasonal": 0.8,
+        "recent_views": 1.7,
+        "recent_purchases": 2.2,
+        "category_affinity": 1.4,
+        "price_sensitivity": 1.3,
+        "brand_loyalty": 1.6,
+        "search_patterns": 1.2,
+        "engagement_score": 1.5
     }
 
     # Extract Numeric Features Using Dot Notation
     num_features = [
         float(ctr) if ctr is not None else 0,
-        browsing_behavior["freq_views"][
-            "overall_avg_category_view_duration"] if "freq_views" in browsing_behavior else 0,
-        browsing_behavior["freq_views"][
-            "overall_avg_product_view_duration"] if "freq_views" in browsing_behavior else 0,
+        browsing_behavior["freq_views"]["overall_avg_category_view_duration"] if "freq_views" in browsing_behavior else 0,
+        browsing_behavior["freq_views"]["overall_avg_product_view_duration"] if "freq_views" in browsing_behavior else 0,
         browsing_behavior["total_add_to_cart"],
         browsing_behavior["total_add_to_wishlist"],
         browsing_behavior["total_clicks"],
@@ -37,7 +42,13 @@ def vectorize(ctr, user_profile, browsing_behavior, purchase_behavior, product_p
         user_profile["account_age_days"],
         user_profile["age"],
         user_profile["avg_session_duration_sec"],
-        user_profile["session_counts_last_30_days"]
+        user_profile["session_counts_last_30_days"],
+        # New features
+        user_profile["category_affinity_score"],
+        user_profile["price_sensitivity_score"],
+        user_profile["brand_loyalty_score"],
+        user_profile["search_pattern_score"],
+        user_profile["engagement_score"]
     ]
 
     # Normalize Numeric Features
@@ -59,6 +70,12 @@ def vectorize(ctr, user_profile, browsing_behavior, purchase_behavior, product_p
     seasonal_data = purchase_behavior["seasonal_data"]
     seasonal_vector = np.array([seasonal_data[season] for season in ["winter", "spring", "summer", "fall"]])
 
+    # Extract Recent Views and Purchases
+    recent_views_vector = model.encode(
+        " ".join(browsing_behavior["freq_views"]["recently_viewed_products"])) if "freq_views" in browsing_behavior else np.zeros(384)
+    recent_purchases_vector = model.encode(
+        " ".join(purchase_behavior["recently_purchased_products"])) if "recently_purchased_products" in purchase_behavior else np.zeros(384)
+
     # Apply Weights and Concatenate
     weighted_vector = np.concatenate([
         norm_num_features * weights["num_features"],
@@ -66,7 +83,9 @@ def vectorize(ctr, user_profile, browsing_behavior, purchase_behavior, product_p
         products_vector * weights["products"],
         brands_vector * weights["brands"],
         user_profile_vector * weights["user_profile"],
-        seasonal_vector * weights["seasonal"]
+        seasonal_vector * weights["seasonal"],
+        recent_views_vector * weights["recent_views"],
+        recent_purchases_vector * weights["recent_purchases"]
     ])
 
     return weighted_vector.tolist()
@@ -97,15 +116,13 @@ def transform_data(user_profile: DataFrame, browsing_behavior: DataFrame,
 
     default_freq_views = struct(
         coalesce(col("freq_views.products"), array().cast("array<string>")).alias("products"),
-        coalesce(col("freq_views.avg_product_view_duration"), array().cast("array<double>")).alias(
-            "avg_product_view_duration"),
-        coalesce(col("freq_views.overall_avg_product_view_duration"), lit(0.0)).alias(
-            "overall_avg_product_view_duration"),
+        coalesce(col("freq_views.avg_product_view_duration"), array().cast("array<double>")).alias("avg_product_view_duration"),
+        coalesce(col("freq_views.overall_avg_product_view_duration"), lit(0.0)).alias("overall_avg_product_view_duration"),
         coalesce(col("freq_views.categories"), array().cast("array<string>")).alias("categories"),
-        coalesce(col("freq_views.avg_category_view_duration"), array().cast("array<double>")).alias(
-            "avg_category_view_duration"),
-        coalesce(col("freq_views.overall_avg_category_view_duration"), lit(0.0)).alias(
-            "overall_avg_category_view_duration")
+        coalesce(col("freq_views.avg_category_view_duration"), array().cast("array<double>")).alias("avg_category_view_duration"),
+        coalesce(col("freq_views.overall_avg_category_view_duration"), lit(0.0)).alias("overall_avg_category_view_duration"),
+        coalesce(col("freq_views.recently_viewed_products"), array().cast("array<string>")).alias("recently_viewed_products"),
+        coalesce(col("freq_views.recent_view_durations"), array().cast("array<bigint>")).alias("recent_view_durations")
     )
 
     browsing_behavior_struct = struct(
@@ -115,10 +132,7 @@ def transform_data(user_profile: DataFrame, browsing_behavior: DataFrame,
         coalesce(col("total_add_to_wishlist"), lit(0)).alias("total_add_to_wishlist"),
 
         # Nested freq_views with defaults
-        coalesce(
-            col("freq_views"),  # Use existing data if available
-            default_freq_views  # Fallback to defaults
-        ).alias("freq_views")
+        default_freq_views.alias("freq_views")
     )
 
     purchase_behavior_columns = [
