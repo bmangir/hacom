@@ -40,7 +40,7 @@ class UserBatchService:
                         .when(col("gender") == "U", "Unisex")
                         .otherwise("P")) \
             .withColumn("account_age_days", datediff(current_date(), col("join_date").cast("date"))) \
-            .drop("address", "birth_date", "join_date")
+            .drop("address", "birth_date")
 
         self.clickstream_df = self.clickstream_df \
             .withColumn("is_click", when((col("action") == "view") & (col("duration_seconds") > 0), 1).otherwise(0)) \
@@ -224,12 +224,12 @@ class UserBatchService:
         added_count_cart = self.clickstream_df.filter(col("action") == "add_to_cart") \
             .groupBy("user_id") \
             .agg(count("*").alias("total_add_to_cart"))
-        added_count_cart = added_count_cart.join(self.users_ids_df, "user_id", "right").fillna({"total_add_to_cart": 0})
+        added_count_cart = added_count_cart.join(self.users_ids_df, "user_id", "right")
 
         added_count_wishlist = self.clickstream_df.filter(col("action") == "add_to_wishlist") \
             .groupBy("user_id") \
             .agg(count("*").alias("total_add_to_wishlist"))
-        added_count_wishlist = added_count_wishlist.join(self.users_ids_df, "user_id", "right").fillna({"total_add_to_wishlist": 0})
+        added_count_wishlist = added_count_wishlist.join(self.users_ids_df, "user_id", "right")
         added_cart_wishlist_df = added_count_cart.join(added_count_wishlist, "user_id", "left")
 
         browsing_df = browsing_df.join(added_cart_wishlist_df, "user_id", "left")
@@ -291,7 +291,6 @@ class UserBatchService:
             .pivot("season", ["winter", "spring", "summer", "fall"]) \
             .agg(avg("orders_per_season").alias("avg_orders_per_season"))
         avg_order_freq_seasonal = avg_order_freq_seasonal.fillna(0)
-        print(avg_order_freq_seasonal.count())
 
         avg_order_freq_seasonal = avg_order_freq_seasonal.withColumn(
             "seasonal_data",
@@ -302,7 +301,6 @@ class UserBatchService:
                 when(col("fall").isNotNull(), col("fall")).otherwise(lit(0.0)).alias("fall")
             )
         ).select("user_id", "seasonal_data")
-        print(avg_order_freq_seasonal.count())
 
         avg_order_freq_seasonal = self.users_ids_df.join(avg_order_freq_seasonal, "user_id", "left")
         default_seasonal = struct(
@@ -316,15 +314,6 @@ class UserBatchService:
             coalesce(col("seasonal_data"), default_seasonal)
         )
 
-        avg_order_freq_seasonal.groupBy("user_id").count().filter("count > 1").show()
-        self.users_ids_df.groupBy("user_id").count().filter("count > 1").show()
-
-
-        print(avg_order_value.count())
-        print(total_spent.count())
-        print(avg_order_freq_monthly.count())
-        print(avg_order_freq_seasonal.count())
-        print(last_30_days_purchases.count())
 
         final_df = total_purchases \
             .join(avg_order_value, "user_id", "right") \
@@ -415,23 +404,218 @@ class UserBatchService:
 
         return ctr_df.select("user_id", "ctr")
 
-    def define_user_features(self, ):
+    def _get_loyalty_score(self):
+        """Calculate user loyalty score based on various metrics"""
+        # Calculate purchase frequency
+        purchase_frequency = self.orders_df.groupBy("user_id") \
+            .agg(count_distinct("order_id").alias("total_orders"))
+        
+        # Calculate average order value
+        avg_order_value = self.orders_df.groupBy("user_id", "order_id") \
+            .agg(sum("total_amount").alias("order_total")) \
+            .groupBy("user_id") \
+            .agg(avg("order_total").alias("avg_order_value"))
+        
+        # Calculate account age in days
+        account_age = self.users_df \
+            .withColumn("account_age_days", datediff(current_date(), col("join_date")))
+        
+        # Calculate review contribution
+        review_contribution = self.reviews_df.groupBy("user_id") \
+            .agg(count("*").alias("review_count"))
+        
+        # Combine metrics into loyalty score
+        loyalty_score = purchase_frequency \
+            .join(avg_order_value, "user_id", "left") \
+            .join(account_age, "user_id", "left") \
+            .join(review_contribution, "user_id", "left") \
+            .withColumn("loyalty_score",
+                (coalesce(col("total_orders"), lit(0)) / 100) * 0.3 +
+                (coalesce(col("avg_order_value"), lit(0)) / 1000) * 0.3 +
+                (coalesce(col("account_age_days"), lit(0)) / 365) * 0.2 +
+                (coalesce(col("review_count"), lit(0)) / 10) * 0.2
+            )
+
+        loyalty_score = self.users_ids_df.join(loyalty_score, "user_id", "left")\
+            .withColumn("loyalty_score", coalesce(col("loyalty_score"), lit(0.0))).fillna({"loyalty_score": 0.0})
+        
+        return loyalty_score.select("user_id", "loyalty_score")
+
+    def _get_engagement_score(self):
+        """Calculate user engagement score based on various interaction metrics"""
+        # Calculate session metrics
+        session_metrics = self.session_df.groupBy("user_id") \
+            .agg(
+                avg("session_duration").alias("avg_session_duration"),
+                count("*").alias("total_sessions")
+            )
+        
+        # Calculate click metrics
+        click_metrics = self.clickstream_df.groupBy("user_id") \
+            .agg(
+                sum("is_click").alias("total_clicks"),
+                sum("is_impression").alias("total_impressions")
+            )
+        
+        # Calculate browsing metrics
+        browsing_metrics = self.browsing_df.groupBy("user_id") \
+            .agg(
+                count("*").alias("total_views"),
+                avg("view_duration").alias("avg_view_duration")
+            )
+        
+        # Combine metrics into engagement score
+        engagement_score = session_metrics \
+            .join(click_metrics, "user_id", "left") \
+            .join(browsing_metrics, "user_id", "left") \
+            .withColumn("engagement_score",
+                (coalesce(col("avg_session_duration"), lit(0)) / 3600) * 0.3 +
+                (coalesce(col("total_sessions"), lit(0)) / 100) * 0.2 +
+                (coalesce(col("total_clicks"), lit(0)) / col("total_impressions")) * 0.2 +
+                (coalesce(col("total_views"), lit(0)) / 100) * 0.2 +
+                (coalesce(col("avg_view_duration"), lit(0)) / 60) * 0.1
+            )
+
+        engagement_score = self.users_ids_df.join(engagement_score, "user_id", "left") \
+            .withColumn("engagement_score", coalesce(col("engagement_score"), lit(0.0))).fillna({"engagement_score": 0.0})
+        
+        return engagement_score.select("user_id", "engagement_score")
+
+    def _get_preference_stability(self):
+        """Calculate how stable user preferences are over time"""
+        # Get category preferences over time
+        category_preferences = self.orders_df \
+            .join(self.products_df.select("product_id", "category"), self.products_df.product_id == self.orders_df.order_product_id) \
+            .groupBy("user_id", "category") \
+            .agg(count("*").alias("category_count"))
+        
+        # Calculate preference stability
+        preference_stability = category_preferences.groupBy("user_id") \
+            .agg(
+                stddev("category_count").alias("category_std"),
+                avg("category_count").alias("category_avg")
+            ) \
+            .withColumn("preference_stability",
+                when(col("category_avg") > 0,
+                    1 - (col("category_std") / col("category_avg"))
+                ).otherwise(0)
+            )
+
+        preference_stability = self.users_ids_df.join(preference_stability, "user_id", "left") \
+            .withColumn("preference_stability", coalesce(col("preference_stability"), lit(0.0))).fillna({"preference_stability": 0.0})
+        
+        return preference_stability.select("user_id", "preference_stability")
+
+    def _get_price_sensitivity(self):
+        """Calculate user's sensitivity to price changes"""
+        # Get price ranges of purchased items
+        price_ranges = self.orders_df \
+            .join(self.products_df.select("product_id", "price"), self.products_df.product_id == self.orders_df.order_product_id) \
+            .groupBy("user_id") \
+            .agg(
+                min("price").alias("min_price"),
+                max("price").alias("max_price"),
+                avg("price").alias("avg_price")
+            )
+        
+        # Calculate price sensitivity
+        price_sensitivity = price_ranges \
+            .withColumn("price_range_ratio",
+                when(col("min_price") > 0,
+                    (col("max_price") - col("min_price")) / col("min_price")
+                ).otherwise(0)
+            ) \
+            .withColumn("price_sensitivity",
+                when(col("price_range_ratio") > 0,
+                    1 / (1 + col("price_range_ratio"))
+                ).otherwise(0.5)
+            )
+
+        price_sensitivity = self.users_ids_df.join(price_sensitivity, "user_id", "left") \
+            .withColumn("price_sensitivity", coalesce(col("price_sensitivity"), lit(0.5))).fillna({"price_sensitivity": 0.5})
+        
+        return price_sensitivity.select("user_id", "price_sensitivity")
+
+    def _get_category_exploration(self):
+        """Calculate how much user explores different categories"""
+        # Count unique categories viewed
+        viewed_categories = self.browsing_df \
+            .join(self.products_df.select("product_id", "category"), "product_id") \
+            .groupBy("user_id") \
+            .agg(count_distinct(self.products_df.category).alias("unique_categories_viewed"))
+        viewed_categories = self.users_ids_df.join(viewed_categories, "user_id", "left")
+        
+        # Count unique categories purchased
+        purchased_categories = self.orders_df \
+            .join(self.products_df.select("product_id", "category"), self.products_df.product_id == self.orders_df.order_product_id) \
+            .groupBy("user_id") \
+            .agg(count_distinct(self.products_df.category).alias("unique_categories_purchased"))
+        purchased_categories = self.users_ids_df.join(purchased_categories, "user_id", "left")
+        
+        # Calculate category exploration score
+        category_exploration = viewed_categories \
+            .join(purchased_categories, "user_id", "left") \
+            .withColumn("category_exploration",
+                (coalesce(col("unique_categories_viewed"), lit(0)) / 10) * 0.6 +
+                (coalesce(col("unique_categories_purchased"), lit(0)) / 5) * 0.4
+            )
+
+        category_exploration = category_exploration.withColumn("category_exploration", coalesce(col("category_exploration"), lit(0.0))).fillna({"category_exploration": 0.0})
+        
+        return category_exploration.select("user_id", "category_exploration")
+
+    def _get_brand_loyalty(self):
+        """Calculate user's loyalty to specific brands"""
+        # Count unique brands purchased
+        brand_purchases = self.orders_df \
+            .join(self.products_df.select("product_id", "brand"), self.products_df.product_id == self.orders_df.order_product_id) \
+            .groupBy("user_id", "brand") \
+            .agg(count("*").alias("brand_purchase_count"))
+        
+        # Calculate brand loyalty score
+        brand_loyalty = brand_purchases.groupBy("user_id") \
+            .agg(
+                count_distinct("brand").alias("unique_brands"),
+                sum("brand_purchase_count").alias("total_purchases")
+            ) \
+            .withColumn("brand_loyalty",
+                when(col("total_purchases") > 0,
+                    col("unique_brands") / col("total_purchases")
+                ).otherwise(0)
+            )
+
+        brand_loyalty = self.users_ids_df.join(brand_loyalty, "user_id", "left") \
+            .withColumn("brand_loyalty", coalesce(col("brand_loyalty"), lit(0.0))).fillna({"brand_loyalty": 0.0})
+        
+        return brand_loyalty.select("user_id", "brand_loyalty")
+
+    def define_user_features(self):
         user_profile = self._get_user_profile()
         browsing_behavior = self._get_browsing_behavior()
         purchase_behavior = self._get_purchase_behavior()
         product_preferences = self._get_product_preferences()
         ctr_df = self._get_ctr()
-
-        print(user_profile.count())
-        print(browsing_behavior.count())
-        print(purchase_behavior.count())
-        print(product_preferences.count())
-        print(ctr_df.count())
+        
+        # New features
+        loyalty_score_df = self._get_loyalty_score()
+        engagement_score_df = self._get_engagement_score()
+        preference_stability_df = self._get_preference_stability()
+        price_sensitivity_df = self._get_price_sensitivity()
+        category_exploration_df = self._get_category_exploration()
+        brand_loyalty_df = self._get_brand_loyalty()
 
         transformed_df = transform_data(user_profile, browsing_behavior, purchase_behavior, product_preferences, ctr_df)
+        
+        # Join new features
+        transformed_df = transformed_df \
+            .join(loyalty_score_df, "user_id", "left") \
+            .join(engagement_score_df, "user_id", "left") \
+            .join(preference_stability_df, "user_id", "left") \
+            .join(price_sensitivity_df, "user_id", "left") \
+            .join(category_exploration_df, "user_id", "left") \
+            .join(brand_loyalty_df, "user_id", "left")
+        
         distributed_df = distribution_of_df_by_range(transformed_df, 1)
-        print(distributed_df.count())
-
         return distributed_df
 
     def vectorize(self, agg_df: DataFrame) -> DataFrame | None:
@@ -443,7 +627,9 @@ class UserBatchService:
         vectorized_df = agg_df.withColumn(
             "values",
             vectorize_udf(
-                col("ctr").cast("float"), col("user_profile"), col("browsing_behavior"), col("purchase_behavior"), col("product_preferences")
+                col("ctr").cast("float"), col("user_profile"), col("browsing_behavior"), col("purchase_behavior"), col("product_preferences"),
+                col("loyalty_score"), col("engagement_score"), col("preference_stability"), col("price_sensitivity"),
+                col("category_exploration"), col("brand_loyalty")
             )
         )
 
@@ -451,11 +637,13 @@ class UserBatchService:
 
     def start_vectorization(self, agg_df):
         vectorized_agg_df = self.vectorize(agg_df)  # Vectorize df
+
         UserModel.store_vectors(vectorized_agg_df)
 
     def start(self):
         distributed_df = self.define_user_features().cache()
-        print(distributed_df.count())
+        a = distributed_df.limit(1).toJSON().collect()
+        print(a)
 
         # Store data in Mongo and HDFS for further usages
         UserModel.store_agg_data_to_mongodb(distributed_df.drop("user_num", "user_range"))

@@ -8,7 +8,8 @@ model = SentenceTransformer("all-MiniLM-L6-v2")
 scaler = MinMaxScaler()
 
 
-def vectorize(ctr, user_profile, browsing_behavior, purchase_behavior, product_preferences):
+def vectorize(ctr, user_profile, browsing_behavior, purchase_behavior, product_preferences,
+              loyalty_score, engagement_score, preference_stability, price_sensitivity, category_exploration, brand_loyalty):
     weights = {
         "num_features": 1.2,
         "categories": 1.5,
@@ -18,11 +19,12 @@ def vectorize(ctr, user_profile, browsing_behavior, purchase_behavior, product_p
         "seasonal": 0.8,
         "recent_views": 1.7,
         "recent_purchases": 2.2,
-        "category_affinity": 1.4,
-        "price_sensitivity": 1.3,
-        "brand_loyalty": 1.6,
-        "search_patterns": 1.2,
-        "engagement_score": 1.5
+        "loyalty_score": 1.4,
+        "engagement_score": 1.3,
+        "preference_stability": 1.2,
+        "price_sensitivity": 1.1,
+        "category_exploration": 1.0,
+        "brand_loyalty": 1.5
     }
 
     # Extract Numeric Features Using Dot Notation
@@ -30,29 +32,31 @@ def vectorize(ctr, user_profile, browsing_behavior, purchase_behavior, product_p
         float(ctr) if ctr is not None else 0,
         browsing_behavior["freq_views"]["overall_avg_category_view_duration"] if "freq_views" in browsing_behavior else 0,
         browsing_behavior["freq_views"]["overall_avg_product_view_duration"] if "freq_views" in browsing_behavior else 0,
-        browsing_behavior["total_add_to_cart"],
-        browsing_behavior["total_add_to_wishlist"],
-        browsing_behavior["total_clicks"],
-        product_preferences["avg_review_rating"],
-        product_preferences["review_count"],
-        purchase_behavior["avg_order_value"],
-        purchase_behavior["avg_orders_per_month"],
-        purchase_behavior["total_purchase"],
-        purchase_behavior["total_spent"],
-        user_profile["account_age_days"],
-        user_profile["age"],
-        user_profile["avg_session_duration_sec"],
-        user_profile["session_counts_last_30_days"],
-        # New features
-        user_profile["category_affinity_score"],
-        user_profile["price_sensitivity_score"],
-        user_profile["brand_loyalty_score"],
-        user_profile["search_pattern_score"],
-        user_profile["engagement_score"]
+        browsing_behavior["total_add_to_cart"] if "total_add_to_cart" in browsing_behavior else 0,
+        browsing_behavior["total_add_to_wishlist"] if "total_add_to_wishlist" in browsing_behavior else 0,
+        browsing_behavior["total_clicks"] if "total_clicks" in browsing_behavior else 0,
+        product_preferences["avg_review_rating"] if "avg_review_rating" in product_preferences else 0,
+        product_preferences["review_count"] if "review_count" in product_preferences else 0,
+        purchase_behavior["avg_order_value"] if "avg_order_value" in purchase_behavior else 0,
+        purchase_behavior["avg_orders_per_month"] if "avg_orders_per_month" in purchase_behavior else 0,
+        purchase_behavior["total_purchase"] if "total_purchase" in purchase_behavior else 0,
+        purchase_behavior["total_spent"] if "total_spent" in purchase_behavior else 0,
+        user_profile["account_age_days"] if "account_age_days" in user_profile else 0,
+        user_profile["age"] if "age" in user_profile else 0,
+        user_profile["avg_session_duration_sec"] if "avg_session_duration_sec" in user_profile else 0,
+        user_profile["session_counts_last_30_days"] ,
+        loyalty_score * weights["loyalty_score"] if loyalty_score else 0,
+        engagement_score * weights["engagement_score"] if engagement_score else 0,
+        preference_stability * weights["preference_stability"] if preference_stability else 0,
+        price_sensitivity * weights["price_sensitivity"] if price_sensitivity else 0,
+        category_exploration * weights["category_exploration"] if category_exploration else 0,
+        brand_loyalty * weights["brand_loyalty"] if brand_loyalty else 0
     ]
 
+    num_features = [float(x) for x in num_features]
+
     # Normalize Numeric Features
-    norm_num_features = scaler.fit_transform(np.array(num_features).reshape(1, -1)).flatten()
+    #norm_num_features = scaler.fit_transform(np.array(num_features).reshape(1, -1)).flatten()
 
     # Convert List-Based Features into Embeddings
     categories_vector = model.encode(
@@ -78,7 +82,7 @@ def vectorize(ctr, user_profile, browsing_behavior, purchase_behavior, product_p
 
     # Apply Weights and Concatenate
     weighted_vector = np.concatenate([
-        norm_num_features * weights["num_features"],
+        num_features,
         categories_vector * weights["categories"],
         products_vector * weights["products"],
         brands_vector * weights["brands"],

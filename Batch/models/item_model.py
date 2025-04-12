@@ -24,14 +24,11 @@ def store_agg_data_to_mongodb(agg_df: DataFrame, coll_name):
     store_df_to_mongodb(db_name=MONGO_AGG_DATA_DB, collection_name=coll_name, df=agg_df)
 
 
-def store_vectors(vectorized_df: DataFrame, index_host, index_name, dimension, metric="cosine", batch_size=600):
+def store_vectors(vectorized_df: DataFrame, index_host, batch_size=400):
     print("Number of partitions: ", vectorized_df.rdd.getNumPartitions())
 
     store_to_pinecone(
         vectors_df=vectorized_df,
         host=index_host,
-        index_name=index_name,
-        dimension=dimension,
-        metric=metric,
         batch_size=batch_size
     )

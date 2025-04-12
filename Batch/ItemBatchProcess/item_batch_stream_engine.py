@@ -35,7 +35,8 @@ class ItemBatchService:
         sentiment_udf = udf(analyze_sentiment, FloatType())
         self.reviews_df = self.reviews_df.withColumn("sentiment_score", sentiment_udf(col("review_text")))
         self.orders_df = self.orders_df.withColumn("order_date_as_day",
-                                                   date_format(from_unixtime(col("order_date") / 1000), "yyyy-MM-dd"))
+                                                   date_format(from_unixtime(col("order_date") / 1000), "yyyy-MM-dd")) \
+                                        .withColumn("price", coalesce(col("order_quantity") * col("unit_price"), lit(0.0)))
 
     def update_avg_ratings(self):
 
@@ -521,19 +522,148 @@ class ItemBatchService:
         return final_df
 
     def define_item_contents(self, basic_item_info_df, content_df):
-        print(basic_item_info_df.columns)
-        print(content_df.columns)
-        basic_item_info_df.show(1)
-        content_df.show(1)
-
         item_content_df = basic_item_info_df.join(content_df, "product_id", "left")
 
         item_content_df = _create_product_contents(item_content_df)
-        item_content_df.select("product_id", "content", "metadata").show(2)
-        b = item_content_df.toJSON().collect()
-        c = [json.loads(row) for row in b]
-        print(c[0])
+
         return item_content_df.select("product_id", "content", "metadata")
+
+    def _get_price_elasticity(self):
+        """Calculate price elasticity based on price changes and sales volume"""
+        price_changes = self.orders_df.groupBy("order_product_id") \
+            .agg(
+                stddev("price").alias("price_std"),
+                avg("price").alias("avg_price"),
+                count("*").alias("total_orders")
+            )
+        
+        sales_volume = self.orders_df.groupBy("order_product_id") \
+            .agg(count("*").alias("total_sales"))
+        
+        elasticity = price_changes.join(sales_volume, "order_product_id") \
+            .withColumn("price_elasticity", 
+                when(col("price_std") > 0, 
+                    (col("total_sales") / col("total_orders")) / (col("price_std") / col("avg_price"))
+                ).otherwise(0)
+            )
+
+        elasticity = self.product_ids_df.join(elasticity, self.product_ids_df.product_id == elasticity.order_product_id, "left") \
+            .withColumn("price_elasticity", coalesce(col("price_elasticity"), lit(0.0)))
+        
+        return elasticity.select("product_id", "price_elasticity")
+
+    def _get_competitor_analysis(self):
+        """Analyze product's position relative to competitors"""
+        category_avg_price = self.products_df.groupBy("category") \
+            .agg(avg("price").alias("category_avg_price"))
+        
+        category_avg_rating = self.reviews_df.groupBy("review_product_id") \
+            .agg(avg("rating").alias("avg_rating")) \
+            .join(self.products_df.select("product_id", "category"), 
+                  col("review_product_id") == col("product_id")) \
+            .groupBy("category") \
+            .agg(avg("avg_rating").alias("category_avg_rating"))
+        
+        competitor_analysis = self.products_df \
+            .join(category_avg_price, "category") \
+            .join(category_avg_rating, "category") \
+            .withColumn("price_competitiveness", 
+                when(col("price") <= col("category_avg_price"), 1.0)
+                .otherwise(0.5)
+            ) \
+            .withColumn("rating_competitiveness",
+                when(col("rating") >= col("category_avg_rating"), 1.0)
+                .otherwise(0.5)
+            ) \
+            .withColumn("competitor_analysis",
+                (col("price_competitiveness") + col("rating_competitiveness")) / 2
+            )
+
+        competitor_analysis = self.product_ids_df.join(competitor_analysis, "product_id", "left") \
+            .withColumn("competitor_analysis", coalesce(col("competitor_analysis"), lit(0.0)))
+        
+        return competitor_analysis.select("product_id", "competitor_analysis")
+
+    def _get_content_quality_score(self):
+        """Calculate content quality score based on various content metrics"""
+        review_quality = self.reviews_df \
+            .withColumn("review_length", length(col("review_text"))) \
+            .groupBy("review_product_id") \
+            .agg(
+                avg("review_length").alias("avg_review_length"),
+                count("*").alias("review_count")
+            )
+        
+        content_quality = self.products_df \
+            .join(review_quality, col("product_id") == col("review_product_id"), "left") \
+            .withColumn("content_quality_score",
+                (coalesce(col("avg_review_length"), lit(0)) / 100) * 0.4 +
+                (coalesce(col("review_count"), lit(0)) / 100) * 0.3
+            )
+
+        content_quality = self.product_ids_df.join(content_quality, "product_id", "left") \
+            .withColumn("content_quality_score", coalesce(col("content_quality_score"), lit(0.0)))
+
+        return content_quality.select("product_id", "content_quality_score")
+
+    def _get_inventory_turnover(self):
+        """Calculate inventory turnover rate"""
+        sales_period = 30  # days
+        sales_volume = self.orders_df \
+            .filter(col("order_timestamp") >= current_timestamp() - expr(f"INTERVAL {sales_period} DAYS")) \
+            .groupBy("order_product_id") \
+            .agg(count("*").alias("sales_volume"))
+        
+        inventory_turnover = self.products_df \
+            .join(sales_volume, col("product_id") == col("order_product_id"), "left") \
+            .withColumn("inventory_turnover",
+                when(col("stock_quantity") > 0,
+                    coalesce(col("sales_volume"), lit(0)) / col("stock_quantity")
+                ).otherwise(0)
+            )
+
+        inventory_turnover = self.product_ids_df.join(inventory_turnover, "product_id", "left") \
+            .withColumn("inventory_turnover", coalesce(col("inventory_turnover"), lit(0.0)))
+
+        return inventory_turnover.select("product_id", "inventory_turnover")
+
+    def _get_return_rate(self):
+        """Calculate product return rate"""
+        total_orders = self.orders_df.groupBy("order_product_id") \
+            .agg(count("*").alias("total_orders"))
+        
+        returns = self.orders_df.filter(col("status") == "returned") \
+            .groupBy("order_product_id") \
+            .agg(count("*").alias("return_count"))
+        
+        return_rate = total_orders.join(returns, "order_product_id", "left") \
+            .withColumn("return_rate",
+                when(col("total_orders") > 0,
+                    coalesce(col("return_count"), lit(0)) / col("total_orders")
+                ).otherwise(0)
+            )
+
+        return_rate = self.product_ids_df.join(return_rate, self.product_ids_df.product_id == return_rate.order_product_id, "left") \
+            .withColumn("return_rate", coalesce(col("return_rate"), lit(0.0)))
+        
+        return return_rate.select("product_id", "return_rate")
+
+    def _get_customer_satisfaction_score(self):
+        """Calculate customer satisfaction score based on reviews and ratings"""
+        review_sentiment = self.reviews_df \
+            .withColumn("sentiment_score", 
+                when(col("rating") >= 4, 1.0)
+                .when(col("rating") >= 3, 0.7)
+                .when(col("rating") >= 2, 0.4)
+                .otherwise(0.1)
+            ) \
+            .groupBy("review_product_id") \
+            .agg(avg("sentiment_score").alias("customer_satisfaction_score"))
+
+        review_sentiment = self.product_ids_df.join(review_sentiment, self.product_ids_df.product_id == review_sentiment.review_product_id, "left") \
+            .withColumn("customer_satisfaction_score", coalesce(col("customer_satisfaction_score"), lit(0.0)))
+        
+        return review_sentiment.select("product_id", "customer_satisfaction_score")
 
     def define_item_profile(self):
         basic_item_information = self._get_basic_item_information()
@@ -543,33 +673,47 @@ class ItemBatchService:
         user_item_interaction_df = self._get_user_item_interaction_features()
         top_n_products_by_cat = self._get_category_based_products(top_n=10)
         seasonal_and_trend_based_df = self._get_seasonal_and_trend_based_features()
+        
+        # New features
+        price_elasticity_df = self._get_price_elasticity()
+        competitor_analysis_df = self._get_competitor_analysis()
+        content_quality_score_df = self._get_content_quality_score()
+        inventory_turnover_df = self._get_inventory_turnover()
+        return_rate_df = self._get_return_rate()
+        customer_satisfaction_score_df = self._get_customer_satisfaction_score()
 
         basic_item_information.cache()
         content_df.cache()
 
-        content_df.limit(1).show()
-        a = content_df.limit(1).collect()
-        print(a)
-
         item_content_df = self.define_item_contents(basic_item_information, content_df)
-        item_content_df.show(1)
-        a = item_content_df.limit(1).collect()
-        print(a)
-
         item_content_df = item_content_df.withColumn("agg_time", (unix_timestamp(current_timestamp()) * 1000))
         distributed_content_df = distribution_of_df_by_range(item_content_df, range=1)
 
-        top_n_products_by_cat = top_n_products_by_cat.withColumn("agg_time",
-                                                                 (unix_timestamp(current_timestamp()) * 1000))
+        top_n_products_by_cat = top_n_products_by_cat.withColumn("agg_time", (unix_timestamp(current_timestamp()) * 1000))
+
+        print(price_elasticity_df.count())
+        print(competitor_analysis_df.count())
+        print(content_quality_score_df.count())
+        print(inventory_turnover_df.count())
+        print(return_rate_df.count())
+        print(customer_satisfaction_score_df.count())
 
         transformed_features_df = item_content_df \
             .join(sales_and_pop_metrics_df, "product_id", "left") \
             .join(user_eng_n_ratings_df, "product_id", "left") \
             .join(user_item_interaction_df, "product_id", "left") \
             .join(seasonal_and_trend_based_df, "product_id", "left") \
+            .join(price_elasticity_df, "product_id", "left") \
+            .join(competitor_analysis_df, "product_id", "left") \
+            .join(content_quality_score_df, "product_id", "left") \
+            .join(inventory_turnover_df, "product_id", "left") \
+            .join(return_rate_df, "product_id", "left") \
+            .join(customer_satisfaction_score_df, "product_id", "left") \
             .withColumn("agg_time", (unix_timestamp(current_timestamp()) * 1000))
 
-        distributed_features_df = distribution_of_df_by_range(transformed_features_df, range=10)
+        print(transformed_features_df.count())
+
+        distributed_features_df = distribution_of_df_by_range(transformed_features_df, range=1)
 
         return distributed_content_df, top_n_products_by_cat, distributed_features_df
 
@@ -577,15 +721,13 @@ class ItemBatchService:
         # Calculate vectors of contents and features
         feature_vector_df = self.vectorize_features(agg_features_df)
         content_vector_df = self.vectorize_contents(agg_contents_df)
-        content_vector_df.show(1)
 
         # Store the vectors in Pinecone, vector database
         start = datetime.now()
-        ItemModel.store_vectors(feature_vector_df, index_host=ITEM_FEATURES_HOST, index_name="item-features", dimension=787)
+        ItemModel.store_vectors(feature_vector_df, index_host="https://item-features-demo-8dq5u7b.svc.aped-4627-b74a.pinecone.io")
         mid = datetime.now()
         print(mid - start)
-        ItemModel.store_vectors(content_vector_df, index_host=ITEM_CONTENTS_HOST, index_name="item-contents",
-                                dimension=384)
+        ItemModel.store_vectors(content_vector_df, index_host=ITEM_CONTENTS_HOST)
         end = datetime.now()
         print(end - mid)
 
@@ -613,17 +755,20 @@ class ItemBatchService:
 
         vectorized_df = agg_features_df \
             .withColumn("values", vectorize_udf(
-            col("purchase_count"), col("view_count"), col("wishlist_count"), col("cart_addition_count"),
-            col("conversion_rate"), col("abandonment_rate"), col("avg_rating"), col("trending_score"),
-            col("seasonal_sales.Winter.total_sold_unit"), col("seasonal_sales.Spring.total_sold_unit"),
-            col("seasonal_sales.Summer.total_sold_unit"), col("seasonal_sales.Fall.total_sold_unit"),
-            col("historical_sales_summary.daily_units_sold"), col("historical_sales_summary.7_day_trend"),
-            col("historical_sales_summary.30_day_trend"),
-            col("latest_sales_summary.last_1_day_sales"), col("latest_sales_summary.last_7_days_sales"),
-            col("latest_sales_summary.last_30_days_sales"),
-            col("content")
-        )) \
+                col("purchase_count"), col("view_count"), col("wishlist_count"), col("cart_addition_count"),
+                col("conversion_rate"), col("abandonment_rate"), col("avg_rating"), col("trending_score"),
+                col("seasonal_sales.Winter.total_sold_unit"), col("seasonal_sales.Spring.total_sold_unit"),
+                col("seasonal_sales.Summer.total_sold_unit"), col("seasonal_sales.Fall.total_sold_unit"),
+                col("historical_sales_summary.daily_units_sold"), col("historical_sales_summary.7_day_trend"),
+                col("historical_sales_summary.30_day_trend"),
+                col("latest_sales_summary.last_1_day_sales"), col("latest_sales_summary.last_7_days_sales"),
+                col("latest_sales_summary.last_30_days_sales"),
+                col("content"), col("price_elasticity"), col("competitor_analysis"), col("content_quality_score"),
+                col("inventory_turnover"), col("return_rate"), col("customer_satisfaction_score"))) \
             .withColumnRenamed("product_id", "id")
+
+        # print vector size
+        print(len(vectorized_df.select("values").first()[0]))
 
         return vectorized_df.select("id", "values")
 
@@ -634,6 +779,9 @@ class ItemBatchService:
         ItemModel.store_agg_data_to_mongodb(top_products_based_cat_df, "top_n_products_by_category")
         ItemModel.store_agg_data_to_mongodb(distributed_content_df.drop("product_num", "product_range", "metadata"), "item_contents")
         ItemModel.store_agg_data_to_mongodb(distributed_features_df.drop("product_num", "product_range", "metadata"), "item_features")
+
+        a = distributed_features_df.limit(1).toJSON().collect()
+        print(a[0])
 
         self.start_vectorization(distributed_features_df, distributed_content_df)
 

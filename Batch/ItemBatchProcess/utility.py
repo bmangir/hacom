@@ -80,13 +80,13 @@ def vectorize_item_features(
         "conversion_rate": 1.1,
         "abandonment_rate": 1.1,
         "trending_score": 1.4,
-        "default": 1.0,
         "price_elasticity": 1.3,
         "competitor_analysis": 1.2,
-        "content_quality": 1.5,
+        "content_quality_score": 1.5,
         "inventory_turnover": 1.1,
-        "return_rate": 1.2,
-        "customer_satisfaction": 1.6
+        "return_rate": 1.0,
+        "customer_satisfaction_score": 1.6,
+        "default": 1.0
     }
 
     try:
@@ -117,10 +117,10 @@ def vectorize_item_features(
             # New features
             safe_get(price_elasticity) * weights["price_elasticity"],
             safe_get(competitor_analysis) * weights["competitor_analysis"],
-            safe_get(content_quality_score) * weights["content_quality"],
+            safe_get(content_quality_score) * weights["content_quality_score"],
             safe_get(inventory_turnover) * weights["inventory_turnover"],
             safe_get(return_rate) * weights["return_rate"],
-            safe_get(customer_satisfaction_score) * weights["customer_satisfaction"]
+            safe_get(customer_satisfaction_score) * weights["customer_satisfaction_score"]
         ]
 
         inputs = tokenizer(content, return_tensors="pt", truncation=True, padding=True, max_length=512)
