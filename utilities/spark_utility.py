@@ -54,7 +54,7 @@ def read_from_mongodb(spark, db_name, coll_name, filter='{}'):
         .option("spark.mongodb.read.connection.uri", MONGO_URI) \
         .option("database", db_name) \
         .option("collection", coll_name) \
-        .option("filter", filter) \
+        .option("pipeline", filter) \
         .load()
 
     return df
@@ -145,7 +145,7 @@ def preprocess_raw_data(users_df, orders_df, reviews_df, cart_df, wishlist_df, b
         .withColumnRenamed("quantity", "order_quantity") \
         .withColumn("order_timestamp", (col("order_date") / 1000).cast("timestamp")) \
         .select("order_id", "user_id", "order_product_id", "order_date", "status", "order_quantity",
-                "total_amount", "payment_method", "updated_at", "order_timestamp")
+                "total_amount", "payment_method", "updated_at", "order_timestamp", "unit_price", "shipping_address")
     reviews_df = reviews_df \
         .withColumnRenamed("product_id", "review_product_id")
     cart_df = cart_df \
@@ -162,8 +162,9 @@ def preprocess_raw_data(users_df, orders_df, reviews_df, cart_df, wishlist_df, b
         .select("user_id", "wishlist_product_id", "wishlist_action_type", "wishlist_action_date")
     browsing_df = browsing_df.withColumnRenamed("referrer_url", "browsing_referred_url") \
         .withColumnRenamed("page_url", "browsing_page_url") \
-        .withColumnRenamed("timestamp", "browsing_timestamp") \
-        .drop("_id", "product_id", "history_id", "session_id")
+        .withColumn("browsing_timestamp", coalesce(col("timestamp"), col("view_date"))) \
+        .drop("_id", "product_id", "history_id", "session_id", "view_date")
+
     clickstream_df = clickstream_df.drop("_id", "product_id", "session_id")
 
     try:

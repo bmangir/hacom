@@ -5,6 +5,36 @@ from dotenv import load_dotenv
 from pinecone import Pinecone
 from pymongo import MongoClient
 
+metadata_fields = {
+    "Clothing": {
+        "brands": ["ComfortWear", "StylePro", "UrbanEdge", "ClassicThreads", "TrendyFit"],
+        "sizes": ["XS", "S", "M", "L", "XL", "XXL"],
+        "colors": ["Red", "Blue", "Green", "Black", "White", "Yellow", "Purple"],
+        "genders": ["Men", "Women", "Unisex"],
+        "materials": ["Cotton", "Polyester", "Denim", "Linen", "Wool", "Silk"],
+        "fit": ["Slim Fit", "Regular Fit", "Loose Fit"],
+        "fabric_types": ["100% Cotton", "50% Polyester, 50% Cotton", "100% Wool", "Denim", "Linen Blend"],
+        "wash_instructions": ["Machine Wash", "Hand Wash", "Dry Clean Only", "Cold Wash"]
+    },
+
+    "Electronics": {
+        "brands": ["TechMax", "ElectroHub", "GigaCore", "InnoVision", "FutureTek"],
+        "products": ["Smartphone", "Laptop", "Tablet", "Smartwatch", "Headphones", "Camera", "Monitor"],
+        "categories": ["Mobile Devices", "Computers", "Accessories", "Wearables", "Audio", "Photography"],
+        "materials": ["Aluminum", "Plastic", "Glass", "Metal"]
+    },
+
+    "Books": {
+        "types": ["Fiction", "Non-Fiction", "Mystery", "Biography", "Science", "Fantasy", "Romance", "History"],
+        "authors": ["John Doe", "Jane Smith", "Alice Johnson", "Mark Brown", "Emily Davis", "Robert White", "Sophie Green"],
+        "publishers": ["Penguin Books", "HarperCollins", "Random House", "Macmillan", "Simon & Schuster", "Oxford Press", "Cambridge University Press"],
+        "languages": ["English", "Spanish", "French", "German", "Italian", "Portuguese"],
+        "tags": ["bestseller", "new release", "classic", "award-winning", "top-rated", "limited edition"],
+        "formats": ["Hardcover", "Paperback", "E-Book"]
+    }
+}
+
+
 load_dotenv()
 
 MONGO_URI = os.getenv("MONGO_URI")
@@ -29,3 +59,5 @@ client = MongoClient(MONGO_URI,
                      serverSelectionTimeoutMS=5000,
                      tlsCAFile=certifi.where(),
                      maxPoolSize=200)
+
+pinecone = Pinecone(PINECONE_API_KEY)
