@@ -42,8 +42,6 @@ def store_vectors(vectorized_df: DataFrame):
 
     store_to_pinecone(
         vectors_df=vectorized_df,
-        host="https://user-features-demo-8dq5u7b.svc.aped-4627-b74a.pinecone.io",
-        index_name="user-features",
-        dimension=2324,
+        host=USER_FEATURES_HOST,
         batch_size=600
     )
