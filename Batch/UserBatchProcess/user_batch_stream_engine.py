@@ -6,6 +6,7 @@ from pyspark.sql.functions import *
 from pyspark.sql.types import FloatType
 
 from Batch.models import user_model as UserModel
+from config import client, MONGO_PRECOMPUTED_DB
 from utility import extract_place_name, transform_data, distribution_of_df_by_range, vectorize
 from utilities.spark_utility import create_spark_session
 
@@ -84,11 +85,12 @@ class UserBatchService:
             .fillna({"session_counts_last_30_days": 0})
         #session_count_last_30_days = self.users_ids_df.join(session_count_last_30_days, "user_id", "left").fillna({"session_counts_last_30_days": 0})
 
-        avg_session_duration_all_history = self.session_df \
+        session_duration_stats = self.session_df \
             .groupBy("user_id") \
-            .agg(round(avg("session_duration"), 2).alias("avg_session_duration_sec")) \
+            .agg(round(avg("session_duration"), 2).alias("avg_session_duration_sec"),
+                 count("*").alias("total_sessions")) \
             .join(self.users_ids_df, "user_id", "right") \
-            .fillna({"avg_session_duration_sec": 0.0})
+            .fillna({"avg_session_duration_sec": 0.0, "total_sessions": 0})
         #avg_session_duration_all_history = self.users_ids_df.join(avg_session_duration_all_history, "user_id", "left").fillna({"avg_session_duration_sec": 0.0})
 
         #user_session_stats = session_count_last_30_days.join(avg_session_duration_all_history, "user_id", "left")
@@ -98,7 +100,7 @@ class UserBatchService:
             .join(preferred_device, "user_id", "left") \
             .join(preferred_payment_method, "user_id", "left") \
             .join(session_count_last_30_days, "user_id", "left") \
-            .join(avg_session_duration_all_history, "user_id", "left") \
+            .join(session_duration_stats, "user_id", "left") \
             .fillna({
             "device_type": "Unknown",
             "payment_method": "Unknown",
@@ -107,7 +109,7 @@ class UserBatchService:
         })
 
         return user_demographics_df.select("user_id", "gender", "age", "location", "account_age_days", "device_type",
-                                           "payment_method", "session_counts_last_30_days", "avg_session_duration_sec")
+                                           "payment_method", "session_counts_last_30_days", "avg_session_duration_sec", "total_sessions")
 
     def _get_browsing_behavior(self, ):
         # Get last 30 days viewed products
@@ -120,6 +122,11 @@ class UserBatchService:
             collect_list("product_id").alias("recently_viewed_products"),
             collect_list("view_duration").alias("recent_view_durations")
         )
+
+        total_views = self.browsing_df.groupBy("user_id")\
+            .agg(count("*").alias("total_views"))\
+            .join(self.users_ids_df, "user_id", "right")\
+            .select("user_id", "total_views")
 
         # Get total clicks
         total_clicks = self.browsing_df.filter(col("browsing_timestamp") >= current_timestamp() - expr("INTERVAL 30 DAYS")) \
@@ -197,6 +204,7 @@ class UserBatchService:
             .join(overall_product_avg_df, "user_id", "outer") \
             .join(overall_category_avg_df, "user_id", "outer") \
             .join(last_30_days_views, "user_id", "left") \
+            .join(total_views, "user_id", "left") \
             .withColumn("products", coalesce(col("products"), array())) \
             .withColumn("avg_product_view_duration", coalesce(col("avg_product_view_duration"), array())) \
             .withColumn("overall_avg_product_view_duration", coalesce(col("overall_avg_product_view_duration"), lit(0.0))) \
@@ -205,6 +213,7 @@ class UserBatchService:
             .withColumn("overall_avg_category_view_duration", coalesce(col("overall_avg_category_view_duration"), lit(0.0))) \
             .withColumn("recently_viewed_products", coalesce(col("recently_viewed_products"), array())) \
             .withColumn("recent_view_durations", coalesce(col("recent_view_durations"), array())) \
+            .withColumn("total_views", coalesce(col("total_views"), lit(0))) \
             .withColumn(
             "freq_views",
             struct(
@@ -234,6 +243,8 @@ class UserBatchService:
 
         browsing_df = browsing_df.join(added_cart_wishlist_df, "user_id", "left")
         browsing_df = self.users_ids_df.join(browsing_df, "user_id", "left")
+
+        browsing_df = browsing_df.join(total_views, "user_id", "left").join(self.users_ids_df, "user_id", "right")
 
         return browsing_df
 
@@ -479,7 +490,7 @@ class UserBatchService:
         engagement_score = self.users_ids_df.join(engagement_score, "user_id", "left") \
             .withColumn("engagement_score", coalesce(col("engagement_score"), lit(0.0))).fillna({"engagement_score": 0.0})
         
-        return engagement_score.select("user_id", "engagement_score")
+        return engagement_score.select("user_id", "engagement_score", "total_impressions", "avg_view_duration")
 
     def _get_preference_stability(self):
         """Calculate how stable user preferences are over time"""
@@ -589,6 +600,11 @@ class UserBatchService:
         
         return brand_loyalty.select("user_id", "brand_loyalty")
 
+    def _get_search_activity(self):
+        # TODO: integrate this later
+        total_searches = self.searches_df.groupBy("user_id") \
+            .agg(count("*").alias("total_searches"))
+
     def define_user_features(self):
         user_profile = self._get_user_profile()
         browsing_behavior = self._get_browsing_behavior()
@@ -629,7 +645,7 @@ class UserBatchService:
             vectorize_udf(
                 col("ctr").cast("float"), col("user_profile"), col("browsing_behavior"), col("purchase_behavior"), col("product_preferences"),
                 col("loyalty_score"), col("engagement_score"), col("preference_stability"), col("price_sensitivity"),
-                col("category_exploration"), col("brand_loyalty")
+                col("category_exploration"), col("brand_loyalty"), col("total_impressions"), col("avg_view_duration")
             )
         )
 
@@ -637,7 +653,6 @@ class UserBatchService:
 
     def start_vectorization(self, agg_df):
         vectorized_agg_df = self.vectorize(agg_df)  # Vectorize df
-
         UserModel.store_vectors(vectorized_agg_df)
 
     def start(self):

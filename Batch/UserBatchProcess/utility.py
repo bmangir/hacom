@@ -9,7 +9,8 @@ scaler = MinMaxScaler()
 
 
 def vectorize(ctr, user_profile, browsing_behavior, purchase_behavior, product_preferences,
-              loyalty_score, engagement_score, preference_stability, price_sensitivity, category_exploration, brand_loyalty):
+              loyalty_score, engagement_score, preference_stability, price_sensitivity, category_exploration, brand_loyalty,
+              total_impressions, avg_view_duration):
     weights = {
         "num_features": 1.2,
         "categories": 1.5,
@@ -24,7 +25,8 @@ def vectorize(ctr, user_profile, browsing_behavior, purchase_behavior, product_p
         "preference_stability": 1.2,
         "price_sensitivity": 1.1,
         "category_exploration": 1.0,
-        "brand_loyalty": 1.5
+        "brand_loyalty": 1.5,
+        "default": 1.0
     }
 
     # Extract Numeric Features Using Dot Notation
@@ -35,6 +37,7 @@ def vectorize(ctr, user_profile, browsing_behavior, purchase_behavior, product_p
         browsing_behavior["total_add_to_cart"] if "total_add_to_cart" in browsing_behavior else 0,
         browsing_behavior["total_add_to_wishlist"] if "total_add_to_wishlist" in browsing_behavior else 0,
         browsing_behavior["total_clicks"] if "total_clicks" in browsing_behavior else 0,
+        browsing_behavior["total_views"] if "total_views" in browsing_behavior else 0,
         product_preferences["avg_review_rating"] if "avg_review_rating" in product_preferences else 0,
         product_preferences["review_count"] if "review_count" in product_preferences else 0,
         purchase_behavior["avg_order_value"] if "avg_order_value" in purchase_behavior else 0,
@@ -44,13 +47,16 @@ def vectorize(ctr, user_profile, browsing_behavior, purchase_behavior, product_p
         user_profile["account_age_days"] if "account_age_days" in user_profile else 0,
         user_profile["age"] if "age" in user_profile else 0,
         user_profile["avg_session_duration_sec"] if "avg_session_duration_sec" in user_profile else 0,
-        user_profile["session_counts_last_30_days"] ,
+        user_profile["session_counts_last_30_days"],
+        user_profile["total_sessions"],
         loyalty_score * weights["loyalty_score"] if loyalty_score else 0,
         engagement_score * weights["engagement_score"] if engagement_score else 0,
         preference_stability * weights["preference_stability"] if preference_stability else 0,
         price_sensitivity * weights["price_sensitivity"] if price_sensitivity else 0,
         category_exploration * weights["category_exploration"] if category_exploration else 0,
-        brand_loyalty * weights["brand_loyalty"] if brand_loyalty else 0
+        brand_loyalty * weights["brand_loyalty"] if brand_loyalty else 0,
+        total_impressions * weights["default"] if total_impressions else 0,
+        avg_view_duration * weights["default"] if avg_view_duration else 0
     ]
 
     num_features = [float(x) for x in num_features]
@@ -132,6 +138,7 @@ def transform_data(user_profile: DataFrame, browsing_behavior: DataFrame,
     browsing_behavior_struct = struct(
         # Top-level fields (total_clicks, etc.)
         coalesce(col("total_clicks"), lit(0)).alias("total_clicks"),
+        coalesce(col("total_views"), lit(0)).alias("total_views"),
         coalesce(col("total_add_to_cart"), lit(0)).alias("total_add_to_cart"),
         coalesce(col("total_add_to_wishlist"), lit(0)).alias("total_add_to_wishlist"),
 
