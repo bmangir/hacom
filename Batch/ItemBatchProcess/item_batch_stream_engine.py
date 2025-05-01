@@ -372,24 +372,6 @@ class ItemBatchService:
             .withColumn("percentage_of_total", (col("total_units_sold") / total_sales) * 100) \
             .withColumnRenamed("order_product_id", "product_id")
 
-        #seasonal_sales_df = (
-        #    seasonal_sales_df
-        #    .groupBy("product_id")
-        #    .agg(
-        #        map_from_entries(
-        #            collect_list(
-        #                struct(
-        #                    col("season"),
-        #                    struct(
-        #                        col("total_units_sold").alias("total_sold_unit"),
-        #                        col("percentage_of_total")
-        #                    )
-        #                )
-        #            )
-        #        ).alias("seasonal_sales")
-        #    )
-        #)
-
         default_seasonal_sales = create_map(
             lit("Winter"), struct(lit(0).alias("total_sold_unit"), lit(0.0).alias("percentage_of_total")),
             lit("Spring"), struct(lit(0).alias("total_sold_unit"), lit(0.0).alias("percentage_of_total")),
@@ -691,13 +673,6 @@ class ItemBatchService:
 
         top_n_products_by_cat = top_n_products_by_cat.withColumn("agg_time", (unix_timestamp(current_timestamp()) * 1000))
 
-        print(price_elasticity_df.count())
-        print(competitor_analysis_df.count())
-        print(content_quality_score_df.count())
-        print(inventory_turnover_df.count())
-        print(return_rate_df.count())
-        print(customer_satisfaction_score_df.count())
-
         transformed_features_df = item_content_df \
             .join(sales_and_pop_metrics_df, "product_id", "left") \
             .join(user_eng_n_ratings_df, "product_id", "left") \
@@ -711,8 +686,6 @@ class ItemBatchService:
             .join(customer_satisfaction_score_df, "product_id", "left") \
             .withColumn("agg_time", (unix_timestamp(current_timestamp()) * 1000))
 
-        print(transformed_features_df.count())
-
         distributed_features_df = distribution_of_df_by_range(transformed_features_df, range=1)
 
         return distributed_content_df, top_n_products_by_cat, distributed_features_df
@@ -724,12 +697,10 @@ class ItemBatchService:
 
         # Store the vectors in Pinecone, vector database
         start = datetime.now()
-        ItemModel.store_vectors(feature_vector_df, index_host="https://item-features-demo-8dq5u7b.svc.aped-4627-b74a.pinecone.io")
-        mid = datetime.now()
-        print(mid - start)
+        ItemModel.store_vectors(feature_vector_df, index_host=ITEM_FEATURES_HOST)
         ItemModel.store_vectors(content_vector_df, index_host=ITEM_CONTENTS_HOST)
         end = datetime.now()
-        print(end - mid)
+        print(end - end)
 
     def vectorize_contents(self, agg_contents_df: DataFrame) -> DataFrame | None:
         if agg_contents_df is None:
@@ -767,9 +738,6 @@ class ItemBatchService:
                 col("inventory_turnover"), col("return_rate"), col("customer_satisfaction_score"))) \
             .withColumnRenamed("product_id", "id")
 
-        # print vector size
-        print(len(vectorized_df.select("values").first()[0]))
-
         return vectorized_df.select("id", "values")
 
     def start(self):
@@ -779,9 +747,6 @@ class ItemBatchService:
         ItemModel.store_agg_data_to_mongodb(top_products_based_cat_df, "top_n_products_by_category")
         ItemModel.store_agg_data_to_mongodb(distributed_content_df.drop("product_num", "product_range", "metadata"), "item_contents")
         ItemModel.store_agg_data_to_mongodb(distributed_features_df.drop("product_num", "product_range", "metadata"), "item_features")
-
-        a = distributed_features_df.limit(1).toJSON().collect()
-        print(a[0])
 
         self.start_vectorization(distributed_features_df, distributed_content_df)
 
@@ -793,4 +758,3 @@ class ItemBatchService:
 
 ibs = ItemBatchService()
 ibs.start()
-print("Bitti")

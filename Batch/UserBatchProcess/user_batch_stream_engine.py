@@ -6,7 +6,6 @@ from pyspark.sql.functions import *
 from pyspark.sql.types import FloatType
 
 from Batch.models import user_model as UserModel
-from config import client, MONGO_PRECOMPUTED_DB
 from utility import extract_place_name, transform_data, distribution_of_df_by_range, vectorize
 from utilities.spark_utility import create_spark_session
 
@@ -662,7 +661,6 @@ class UserBatchService:
 
         # Store data in Mongo and HDFS for further usages
         UserModel.store_agg_data_to_mongodb(distributed_df.drop("user_num", "user_range"))
-        #UserModel.store_df_to_hdfs(distributed_df, "user_range")  # No need to write to hdfs if in same job
 
         self.start_vectorization(distributed_df)
 
@@ -678,5 +676,3 @@ start = datetime.now()
 ubs = UserBatchService()
 ubs.start()
 print(datetime.now() - start)
-print("Bitti")
-
