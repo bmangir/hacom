@@ -1,7 +1,10 @@
 import os
 import traceback
+from _decimal import Decimal
 from datetime import datetime
 
+from pymongo import errors
+from pyspark import Row
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql.dataframe import DataFrame
@@ -21,9 +24,12 @@ def create_spark_session(app_name, spark=None, num_of_partition="100"):
         spark = SparkSession.builder.appName(app_name) \
             .master("local[*]") \
             .config("spark.mongodb.read.connection.uri", MONGO_URI) \
+            .config("spark.mongodb.write.connection.uri", MONGO_URI) \
             .config("spark.jars.packages",
                     "org.postgresql:postgresql:42.6.0,"
-                    "org.mongodb.spark:mongo-spark-connector_2.12:10.1.1") \
+                    "org.mongodb.spark:mongo-spark-connector_2.12:10.1.1,"
+                    "org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,"
+                    "org.apache.kafka:kafka-clients:2.8.0") \
             .config("spark.mongodb.input.partitioner", "MongoSamplePartitioner") \
             .config("spark.mongodb.input.partitionerOptions.samplesPerPartition", "1000") \
             .config("spark.logConf", "true") \
@@ -43,6 +49,8 @@ def create_spark_session(app_name, spark=None, num_of_partition="100"):
             .config("spark.dynamicAllocation.initialExecutors", "10") \
             .config("spark.task.maxFailures", "10") \
             .config("spark.speculation", "true") \
+            .config("spark.kafka.bootstrap.servers", "localhost:9092") \
+            .config("spark.kafka.consumer.cache.capacity", "256") \
             .getOrCreate()
 
     return spark
@@ -73,9 +81,10 @@ def read_postgres_table(spark, table_name) -> DataFrame:
 
 def extract_data(spark: SparkSession):
     try:
-        products_df = read_from_mongodb(spark, MONGO_PRODUCTS_DB, "products")
         clickstream_df = read_from_mongodb(spark, MONGO_BROWSING_DB, "clickstream")
+        products_df = read_from_mongodb(spark, MONGO_PRODUCTS_DB, "products")
         browsing_df = read_from_mongodb(spark, MONGO_BROWSING_DB, "browsing_history")
+        searchs_df = read_from_mongodb(spark, MONGO_BROWSING_DB, "search_history")
 
         users_df = read_postgres_table(spark, "users")
         orders_df = read_postgres_table(spark, "orders")
@@ -336,24 +345,7 @@ def read_from_hdfs(spark: SparkSession, base_path: str):
         return
 
 
-def store_df_to_mongodb(db_name, collection_name, df: DataFrame, mode="overwrite"):
-    if df is None:
-        collection.insert_one(document={
-            "process_type": "batch",
-            "caller_function": inspect.stack()[1].function,
-            "error_type": "DataFrame is empty",
-            "error_msg": "DataFrame is empty",
-            "where": {
-                "func": "store_df_to_mongodb",
-                "op": "Writing dataframe to MongoDB"
-            },
-            "succeed_msg": None,
-            "status": "F",
-            "at": datetime.now(),
-            "comment": f"Check the dataframe that been taken from {inspect.stack()[1]}"
-        })
-        return
-
+def store_df_to_mongodb(db_name, collection_name, df: DataFrame, mode="append"):
     try:
         df.write \
             .format("mongodb") \
@@ -363,35 +355,36 @@ def store_df_to_mongodb(db_name, collection_name, df: DataFrame, mode="overwrite
             .option("collection", collection_name) \
             .save()
 
-        collection.insert_one(document={
-            "process_type": "batch",
-            "caller_function": inspect.stack()[1].function,
-            "error_type": None,
-            "error_msg": None,
-            "where": {
-                "func": "store_df_to_mongodb",
-                "op": "Writing dataframe to MongoDB"
-            },
-            "succeed_msg": f"Successfully written dataframe to MongoDB",
-            "status": "S",
-            "at": datetime.now(),
-            "comment": ""
-        })
-
+        print("done")
     except Exception as e:
-        collection.insert_one(document={
-            "process_type": "batch",
-            "caller_function": inspect.stack()[1].function,
-            "error_type": e.__class__.__name__,
-            "error_msg": traceback.format_exc(),
-            "where": {
-                "func": "store_df_to_mongodb",
-                "op": "Writing dataframe to MongoDB"
-            },
-            "succeed_msg": None,
-            "status": "F",
-            "at": datetime.now(),
-            "comment": f"Check the dataframe that been taken from {inspect.stack()[1]}, check connection the uri."
-        })
+        print(f"Error storing DataFrame to MongoDB: {e}")
 
-        return
+
+def update_doc_in_mongodb(db_name, collection_name, df, id_col):
+    db = client[db_name]
+    collection = db[collection_name]
+
+    for row in df.collect():
+        doc = bson_safe(row)
+        id = doc[f"{id_col}"]
+
+        if "_id" in doc:
+            del doc["_id"]
+
+        collection.update_one(
+            {f"{id_col}": id},
+            {"$set": doc},
+            upsert=True
+        )
+
+def bson_safe(obj):
+    if isinstance(obj, Row):
+        return bson_safe(obj.asDict())  # Convert Row to dict first
+    elif isinstance(obj, dict):
+        return {k: bson_safe(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [bson_safe(item) for item in obj]
+    elif isinstance(obj, Decimal):
+        return float(obj)
+    else:
+        return obj
