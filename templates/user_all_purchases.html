@@ -1,0 +1,498 @@
+{% extends "base.html" %}
+
+{% block title %}Purchase History - HACOM{% endblock %}
+
+{% block additional_styles %}
+.purchases-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.purchases-header {
+    margin-bottom: 30px;
+}
+
+.purchases-header h1 {
+    color: #162938;
+    font-size: 2em;
+    margin-bottom: 10px;
+}
+
+.purchases-layout {
+    display: flex;
+    gap: 30px;
+    margin: 0 auto;
+    padding: 20px;
+    flex-wrap: wrap;
+}
+
+.purchases-main {
+    flex: 1;
+    min-width: 300px;
+}
+
+.profile-nav {
+    width: 250px;
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    height: fit-content;
+    position: sticky;
+    top: 20px;
+    flex-shrink: 0;
+}
+
+.profile-nav h2 {
+    color: #162938;
+    margin-bottom: 20px;
+    font-size: 1.5em;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #FF8C42;
+}
+
+.profile-nav-link {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    color: #162938;
+    background: #fff;
+    text-decoration: none;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    border: 1px solid #eee;
+}
+
+.profile-nav-link:hover {
+    background: linear-gradient(135deg, #ff7b00, #ff3d00);
+    color: white;
+    transform: translateX(5px);
+    box-shadow: 0 4px 8px rgba(255, 61, 0, 0.2);
+}
+
+.profile-nav-link i {
+    margin-right: 10px;
+    font-size: 1.2em;
+    width: 24px;
+    text-align: center;
+}
+
+.profile-nav-link.active {
+    background: linear-gradient(135deg, #ff7b00, #ff3d00);
+    color: white;
+    box-shadow: 0 4px 8px rgba(255, 61, 0, 0.2);
+}
+
+.profile-nav-section {
+    margin-bottom: 20px;
+}
+
+.profile-nav-section-title {
+    color: #666;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    padding-left: 15px;
+}
+
+.filter-section {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.filter-section h3 {
+    color: #162938;
+    margin-bottom: 15px;
+}
+
+.filter-form {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    flex: 1;
+    min-width: 200px;
+}
+
+.filter-group label {
+    display: block;
+    margin-bottom: 5px;
+    color: #162938;
+}
+
+.filter-group select,
+.filter-group input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.filter-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.filter-btn {
+    padding: 8px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.apply-filter {
+    background: #162938;
+    color: white;
+}
+
+.clear-filter {
+    background: #f0f0f0;
+    color: #162938;
+}
+
+.products-grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.product-card {
+    background: white;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    height: 400px;
+}
+
+.product-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+}
+
+.product-card .product-image {
+width: 100%;
+height: auto;
+overflow: hidden;
+border-radius: 8px;
+}
+
+.product-card .product-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.product-card .product-info {
+flex: 1;
+display: flex;
+flex-direction: column;
+align-items: center; /* Center horizontally */
+padding: 10px 0;
+text-align: center; /* Center text */
+}
+
+.product-card .product-info h3 {
+font-size: 1.1em;
+color: #162938;
+margin: 10px 0;
+display: -webkit-box;
+-webkit-line-clamp: 2;
+-webkit-box-orient: vertical;
+overflow: hidden;
+text-overflow: ellipsis;
+height: 2.8em;
+}
+
+.product-card .product-price {
+    color: #00C4FF;
+    font-size: 1.2em;
+    font-weight: bold;
+    margin: 8px 0;
+}
+
+.product-card .purchase-date {
+    color: #666;
+    font-size: 0.9em;
+    margin: 5px 0;
+}
+
+.product-card .purchase-details {
+    color: #666;
+    font-size: 0.9em;
+    margin: 5px 0;
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+}
+
+.product-card .button-container {
+    margin-top: auto;
+    padding-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.product-card .view-details {
+    display: inline-block;
+    padding: 12px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    color: white;
+    background: linear-gradient(135deg, #ff7b00, #ff3d00);
+    border: none;
+    border-radius: 25px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.3s ease-in-out;
+    box-shadow: 0 4px 10px rgba(255, 61, 0, 0.2);
+    width: 100%;
+    text-align: center;
+}
+
+.view-details:hover {
+    background: linear-gradient(135deg, #ff3d00, #ff7b00);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(255, 61, 0, 0.3);
+}
+
+.view-details:active {
+    transform: translateY(1px);
+}
+
+.write-review-btn {
+    display: inline-block;
+    padding: 12px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    color: #162938;
+    background: #f0f0f0;
+    border: none;
+    border-radius: 25px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.3s ease-in-out;
+    width: 100%;
+    text-align: center;
+}
+
+.write-review-btn:hover {
+    background: #e0e0e0;
+    transform: translateY(-2px);
+}
+
+.write-review-btn:active {
+    transform: translateY(1px);
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 30px;
+    gap: 10px;
+}
+
+.pagination-btn {
+    padding: 8px 15px;
+    background: #162938;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.pagination-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.page-info {
+    margin: 0 15px;
+    color: #162938;
+}
+
+.no-purchases {
+    text-align: center;
+    padding: 40px;
+    background: white;
+    border-radius: 10px;
+    color: #666;
+}
+.product-status {
+font-size: 1em;
+color: #888;
+margin-left: 10px;
+font-weight: 500;
+}
+
+{% endblock %}
+
+{% block content %}
+<div class="purchases-layout">
+    <div class="purchases-main">
+        <div class="purchases-header">
+            <h1>Purchase History</h1>
+        </div>
+
+        <div class="filter-section">
+            <h3>Filter Purchases</h3>
+            <form class="filter-form" method="GET">
+                <div class="filter-group">
+                    <label for="date-range">Date Range</label>
+                    <select name="date_range" id="date-range">
+                        <option value="all" {% if date_range == 'all' %}selected{% endif %}>All Time</option>
+                        <option value="today" {% if date_range == 'today' %}selected{% endif %}>Today</option>
+                        <option value="week" {% if date_range == 'week' %}selected{% endif %}>Last 7 Days</option>
+                        <option value="month" {% if date_range == 'month' %}selected{% endif %}>Last 30 Days</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="sort-by">Sort By</label>
+                    <select name="sort_by" id="sort-by">
+                        <option value="recent" {% if sort_by == 'recent' %}selected{% endif %}>Most Recent</option>
+                        <option value="price-high" {% if sort_by == 'price-high' %}selected{% endif %}>Price: High to Low</option>
+                        <option value="price-low" {% if sort_by == 'price-low' %}selected{% endif %}>Price: Low to High</option>
+                        <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Product Name</option>
+                    </select>
+                </div>
+                <div class="filter-buttons">
+                    <button type="submit" class="filter-btn apply-filter">Apply Filters</button>
+                    <button type="button" class="filter-btn clear-filter" onclick="clearFilters()">Clear Filters</button>
+                </div>
+            </form>
+        </div>
+
+        {% if purchased_products %}
+            <div class="products-grid">
+                {% for product in purchased_products %}
+                    <div class="product-card">
+                        <div class="product-image">
+                            <img src="{{ product.image_url }}" alt="{{ product.product_name }}" onerror="this.src='/static/images/default-product.jpg'">
+                        </div>
+                        <div class="product-info">
+                            <h3>{{ product.product_name }}</h3>
+                            <p class="product-price">${{ "%.2f"|format(product.price) }} - <span class="product-status">{{ product.status }}</span></p>
+                            <p class="purchase-date">Purchased on: {{ product.purchase_date }}</p>
+                            <div class="purchase-details">
+                                <span>Qty: {{ product.quantity }}</span>
+                                <span>Total: ${{ "%.2f"|format(product.total_price) }}</span>
+                            </div>
+                            <div class="button-container">
+                                <a href="/product/{{ product.product_id }}" class="view-details">View Details</a>
+                                {% if not product.has_review %}
+                                <a href="/product/{{ product.product_id }}/review" class="write-review-btn">Write a Review</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <div class="pagination">
+                <button class="pagination-btn" {% if not has_prev %}disabled{% endif %} onclick="changePage({{ page - 1 }})">
+                    Previous
+                </button>
+                <span class="page-info">Page {{ page }} of {{ total_pages }}</span>
+                <button class="pagination-btn" {% if not has_next %}disabled{% endif %} onclick="changePage({{ page + 1 }})">
+                    Next
+                </button>
+            </div>
+        {% else %}
+            <div class="no-purchases">
+                <h3>No purchase history found</h3>
+                <p>Start shopping to see your purchase history here!</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="profile-nav">
+        <h2>Quick Navigation</h2>
+        
+        <div class="profile-nav-section">
+            <div class="profile-nav-section-title">Shopping</div>
+            <a href="/all-visits" class="profile-nav-link {% if active_page == 'visits' %}active{% endif %}">
+                <i class="fas fa-history"></i>
+                Products I've Visited
+            </a>
+            <a href="/my-purchases" class="profile-nav-link {% if active_page == 'purchases' %}active{% endif %}">
+                <i class="fas fa-shopping-bag"></i>
+                My Purchases
+            </a>
+            <a href="/wishlist" class="profile-nav-link {% if active_page == 'wishlist' %}active{% endif %}">
+                <i class="fas fa-heart"></i>
+                My Wishlist
+            </a>
+        </div>
+
+        <div class="profile-nav-section">
+            <div class="profile-nav-section-title">Account</div>
+            <a href="/my-profile" class="profile-nav-link {% if active_page == 'profile' %}active{% endif %}">
+                <i class="fas fa-user"></i>
+                My Profile
+            </a>
+            <a href="/my-profile/details" class="profile-nav-link {% if active_page == 'details' %}active{% endif %}">
+                <i class="fas fa-id-card"></i>
+                Profile Details
+            </a>
+            <a href="/my-profile/details/my-addresses" class="profile-nav-link {% if active_page == 'addresses' %}active{% endif %}">
+                <i class="fas fa-map-marker-alt"></i>
+                My Addresses
+            </a>
+        </div>
+
+        <div class="profile-nav-section">
+            <div class="profile-nav-section-title">Reviews & Feedback</div>
+            <a href="/my-reviews" class="profile-nav-link {% if active_page == 'reviews' %}active{% endif %}">
+                <i class="fas fa-star"></i>
+                My Reviews
+            </a>
+            <a href="/my-comments" class="profile-nav-link {% if active_page == 'comments' %}active{% endif %}">
+                <i class="fas fa-comments"></i>
+                My Comments
+            </a>
+        </div>
+
+        <div class="profile-nav-section">
+            <div class="profile-nav-section-title">Settings</div>
+            <a href="/my-profile/settings" class="profile-nav-link {% if active_page == 'settings' %}active{% endif %}">
+                <i class="fas fa-cog"></i>
+                Account Settings
+            </a>
+            <a href="/my-profile/notifications" class="profile-nav-link {% if active_page == 'notifications' %}active{% endif %}">
+                <i class="fas fa-bell"></i>
+                Notifications
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+function clearFilters() {
+    window.location.href = window.location.pathname;
+}
+
+function changePage(page) {
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.set('page', page);
+    window.location.search = urlParams.toString();
+}
+</script>
+{% endblock %} 
