@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Shopping Cart - HACOM{% endblock %}
+
+{% block additional_styles %}
+<style>
+    .cart-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .cart-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px;
+        margin-bottom: 20px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .cart-item img {
+        max-width: 100px;
+        height: auto;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .cart-item-info {
+        flex: 1;
+        padding-left: 20px;
+    }
+
+    .cart-item-info h2 {
+        margin: 0;
+        font-size: 1.5em;
+        color: #162938;
+    }
+
+    .cart-item-info p {
+        margin: 5px 0;
+        color: #666;
+    }
+
+    .cart-item-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .quantity-btn {
+        padding: 4px 8px; /* Reduced padding */
+        font-size: 1em; /* Smaller font size */
+        cursor: pointer;
+        background: #162938;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        transition: background 0.3s;
+        text-decoration: none; /* Ensure no underline */
+    }
+
+    .quantity-btn:hover {
+        background: #2a3f54;
+        text-decoration: none; /* Ensure no underline on hover */
+    }
+
+
+    .cart-summary {
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        margin-top: 40px;
+    }
+
+    .cart-summary h3 {
+        font-size: 1.8em;
+        margin-bottom: 10px;
+        color: #162938;
+    }
+
+    .cart-summary p {
+        font-size: 1.2em;
+        color: #2a3f54;
+    }
+
+    .cart-summary .checkout-btn {
+        padding: 12px 25px;
+        font-size: 1.2em;
+        background-color: #00C4FF;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        width: 100%;
+        margin-top: 20px;
+        transition: background 0.3s;
+    }
+
+    .cart-summary .checkout-btn:hover {
+        background: #0098c8;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cart-container">
+    <h1>Shopping Cart</h1>
+
+    {% if cart_items %}
+    <ul>
+        {% for item in cart_items %}
+        <li class="cart-item">
+            <a href="/product/{{ item.id }}">
+                <img src="{{ item.image_url }}" alt="{{ item.name }}" onerror="this.src='/static/images/default-product.jpg'">
+            </a>
+            <div class="cart-item-info">
+                <a href="/product/{{ item.id }}">
+                    <h2>{{ item.name }}</h2>
+                </a>
+                <p>Price: ${{ "%.2f"|format(item.price) }}</p>
+                <p>Quantity:
+                    <a href="{{ url_for('cart_wishlist_controller_blueprint.update_cart_quantity', cart_id=item.cart_id, quantity=item.quantity - 1) }}" class="quantity-btn">-</a>
+                    <span id="quantity-{{ item.id }}">{{ item.quantity }}</span>
+                    <a href="{{ url_for('cart_wishlist_controller_blueprint.update_cart_quantity', cart_id=item.cart_id, quantity=item.quantity + 1) }}" class="quantity-btn">+</a>
+                </p>
+            </div>
+            <form action="{{ url_for('cart_wishlist_controller_blueprint.remove_from_cart', product_id=item.id) }}" method="POST">
+                <button type="submit" class="quantity-btn">Remove</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+
+    <div class="cart-summary">
+        <h3>Total: ${{ "%.2f"|format(total) }}</h3>
+        <a href="/checkout" class="checkout-btn">Proceed to Checkout</a>
+    </div>
+    {% else %}
+    <p>Your cart is empty.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+<script>
+function updateQuantity(cart_id, change) {
+    console.log(`Updating quantity for cart_id: ${cart_id} with change: ${change}`);
+    const quantityElement = document.getElementById(`quantity-${cart_id}`);
+    let currentQuantity = parseInt(quantityElement.innerText);
+
+    if (currentQuantity + change > 0) {
+        currentQuantity += change;
+        quantityElement.innerText = currentQuantity;
+
+        // Log the URL to ensure it's correct
+        const url = `/cart/update/${cart_id}`;
+        console.log('Updating quantity with URL:', url);
+
+        // Send the updated quantity to the backend
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ quantity: currentQuantity })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                alert('Failed to update quantity: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+    }
+}
+</script>

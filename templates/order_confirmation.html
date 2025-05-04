@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Order Confirmation - HACOM{% endblock %}
+
+{% block additional_styles %}
+.confirmation-container {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 20px;
+}
+
+.confirmation-card {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.success-icon {
+    width: 80px;
+    height: 80px;
+    background: #4CAF50;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+}
+
+.success-icon i {
+    color: white;
+    font-size: 40px;
+}
+
+.confirmation-title {
+    color: #162938;
+    font-size: 24px;
+    margin-bottom: 10px;
+}
+
+.order-number {
+    color: #666;
+    font-size: 18px;
+    margin-bottom: 30px;
+}
+
+.order-details {
+    text-align: left;
+    margin-top: 30px;
+    padding-top: 30px;
+    border-top: 2px solid #f0f0f0;
+}
+
+.detail-group {
+    margin-bottom: 20px;
+}
+
+.detail-group h3 {
+    color: #162938;
+    margin-bottom: 10px;
+}
+
+.detail-group p {
+    color: #666;
+    margin: 5px 0;
+}
+
+.items-list {
+    margin: 20px 0;
+}
+
+.item {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.total-amount {
+    font-size: 20px;
+    font-weight: bold;
+    color: #162938;
+    margin-top: 20px;
+    text-align: right;
+}
+
+.back-to-shop {
+    display: inline-block;
+    padding: 12px 30px;
+    background: linear-gradient(135deg, #ff7b00, #ff3d00);
+    color: white;
+    text-decoration: none;
+    border-radius: 25px;
+    margin-top: 30px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.back-to-shop:hover {
+    background: linear-gradient(135deg, #ff3d00, #ff7b00);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(255, 61, 0, 0.3);
+}
+{% endblock %}
+
+{% block content %}
+<div class="confirmation-container">
+    <div class="confirmation-card">
+        <div class="success-icon">
+            <i class="fas fa-check"></i>
+        </div>
+        
+        <h1 class="confirmation-title">Thank You for Your Order!</h1>
+        <p class="order-number">Order #{{ order.order_id }}</p>
+        
+        <div class="order-details">
+            <div class="detail-group">
+                <h3>Shipping Information</h3>
+                <p>{{ order.shipping_info.full_name }}</p>
+                <p>{{ order.shipping_info.address }}</p>
+                <p>{{ order.shipping_info.city }}, {{ order.shipping_info.zip_code }}</p>
+                <p>{{ order.shipping_info.email }}</p>
+                <p>{{ order.shipping_info.phone }}</p>
+            </div>
+            
+            <div class="detail-group">
+                <h3>Order Summary</h3>
+                <div class="items-list">
+                    {% for item in order['items'] %}
+                    <div class="item">
+                        <span>{{ item['name'] }} (x{{ item['quantity'] }})</span>
+                        <span>${{ "%.2f"|format(item['price'] * item['quantity']) }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <div class="item">
+                    <span>Shipping</span>
+                    <span>${{ "%.2f"|format(order.shipping_cost) }}</span>
+                </div>
+                
+                <div class="total-amount">
+                    Total: ${{ "%.2f"|format(order.total) }}
+                </div>
+            </div>
+        </div>
+        
+        <a href="/" class="back-to-shop">Continue Shopping</a>
+    </div>
+</div>
+{% endblock %} 

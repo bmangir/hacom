@@ -1,0 +1,425 @@
+{% extends "base.html" %}
+
+{% block title %}My Profile - HACOM{% endblock %}
+
+{% block additional_styles %}
+.profile-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.profile-header {
+    margin-bottom: 30px;
+}
+
+.profile-header h1 {
+    color: #162938;
+    font-size: 2em;
+    margin-bottom: 10px;
+}
+
+.products-section {
+    margin-bottom: 40px;
+    position: relative;
+    padding: 0 25px;
+    width: 100%;
+    overflow-x: hidden;
+}
+
+.products-section h2 {
+    color: #162938;
+    margin-bottom: 20px;
+}
+
+.products-slider {
+    display: flex;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    padding: 20px 0;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    overflow-x: auto;
+}
+
+.product-slide {
+    flex: 0 0 250px;
+    margin-right: 20px;
+    background: white;
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    scroll-snap-align: start;
+}
+
+.product-slide img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 5px;
+}
+
+.product-info {
+    margin-top: 10px;
+    text-align: center;
+}
+
+.product-info h3 {
+    font-size: 1.1em;
+    color: #162938;
+    margin: 10px 0;
+}
+
+.product-price {
+    color: #00C4FF;
+    font-size: 1.2em;
+    font-weight: bold;
+    margin: 10px 0;
+}
+
+.slider-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(22, 41, 56, 0.9);
+    color: white;
+    border: none;
+    padding: 15px;
+    cursor: pointer;
+    border-radius: 50%;
+    z-index: 2;
+    transition: all 0.3s ease;
+    width: 45px;
+    height: 45px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.slider-arrow:hover {
+    background: rgba(22, 41, 56, 1);
+    transform: translateY(-50%) scale(1.1);
+}
+
+.slider-arrow.left {
+    left: -5px;
+}
+
+.slider-arrow.right {
+    right: -5px;
+}
+
+.view-details-btn {
+    width: 100%;
+    padding: 8px;
+    background: #162938;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.view-details-btn:hover {
+    background: #2a3f54;
+}
+
+.profile-layout {
+    display: flex;
+    gap: 30px;
+    margin: 0 auto;
+    padding: 20px;
+    flex-wrap: wrap;
+}
+
+.profile-main {
+    flex: 1;
+    min-width: 300px;
+}
+
+.profile-nav {
+    width: 250px;
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    height: fit-content;
+    position: sticky;
+    top: 20px;
+    flex-shrink: 0;
+}
+
+.profile-nav h2 {
+    color: #162938;
+    margin-bottom: 20px;
+    font-size: 1.5em;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #FF8C42;
+}
+
+.profile-nav-link {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    color: #162938;
+    background: #fff;
+    text-decoration: none;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    border: 1px solid #eee;
+}
+
+.profile-nav-link:hover {
+    background: linear-gradient(135deg, #ff7b00, #ff3d00);
+    color: white;
+    transform: translateX(5px);
+    box-shadow: 0 4px 8px rgba(255, 61, 0, 0.2);
+}
+
+.profile-nav-link i {
+    margin-right: 10px;
+    font-size: 1.2em;
+    width: 24px;
+    text-align: center;
+}
+
+.profile-nav-link.active {
+    background: linear-gradient(135deg, #ff7b00, #ff3d00);
+    color: white;
+    box-shadow: 0 4px 8px rgba(255, 61, 0, 0.2);
+}
+
+.profile-nav-section {
+    margin-bottom: 20px;
+}
+
+.profile-nav-section-title {
+    color: #666;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    padding-left: 15px;
+}
+{% endblock %}
+
+{% block content %}
+<div class="profile-layout">
+    <div class="profile-main">
+        <div class="profile-header">
+            <h1>My Profile</h1>
+        </div>
+
+        <!-- Recently Visited Products Section -->
+        <div class="products-section">
+            <h2>Recently Visited Products</h2>
+            {% if recent_products %}
+                <button class="slider-arrow left" onclick="slideProducts('left', 'recentSlider')" id="recentLeftArrow" style="display: none;">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <button class="slider-arrow right" onclick="slideProducts('right', 'recentSlider')" id="recentRightArrow">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                <div class="products-slider" id="recentSlider">
+                    {% for product in recent_products %}
+                        <div class="product-slide">
+                            <img src="{{ product.image_url }}" alt="{{ product.product_name }}" onerror="this.src='/static/images/default-product.jpg'">
+                            <div class="product-info">
+                                <h3>{{ product.product_name }}</h3>
+                                <p class="product-price">${{ "%.2f"|format(product.price) }}</p>
+                                <button class="view-details-btn" onclick="window.location.href='/product/{{ product.product_id }}'">
+                                    View Details
+                                </button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p>No recently visited products</p>
+            {% endif %}
+        </div>
+
+        <!-- Purchased Products Section -->
+        <div class="products-section">
+            <h2>Purchase History</h2>
+            {% if purchased_products %}
+                <button class="slider-arrow left" onclick="slideProducts('left', 'purchasedSlider')" id="purchasedLeftArrow" style="display: none;">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <button class="slider-arrow right" onclick="slideProducts('right', 'purchasedSlider')" id="purchasedRightArrow">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                <div class="products-slider" id="purchasedSlider">
+                    {% for product in purchased_products %}
+                        <div class="product-slide">
+                            <img src="{{ product.image_url }}" alt="{{ product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                            <div class="product-info">
+                                <h3>{{ product.name }}</h3>
+                                <p class="product-price">${{ "%.2f"|format(product.price) }}</p>
+                                <button class="view-details-btn" onclick="window.location.href='/product/{{ product.id }}'">
+                                    View Details
+                                </button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p>No purchase history</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="profile-nav">
+        <h2>Quick Navigation</h2>
+        
+        <div class="profile-nav-section">
+            <div class="profile-nav-section-title">Shopping</div>
+            <a href="/all-visits" class="profile-nav-link {% if active_page == 'visits' %}active{% endif %}">
+                <i class="fas fa-history"></i>
+                Products I've Visited
+            </a>
+            <a href="/my-purchases" class="profile-nav-link {% if active_page == 'purchases' %}active{% endif %}">
+                <i class="fas fa-shopping-bag"></i>
+                My Purchases
+            </a>
+            <a href="/wishlist" class="profile-nav-link {% if active_page == 'wishlist' %}active{% endif %}">
+                <i class="fas fa-heart"></i>
+                My Wishlist
+            </a>
+        </div>
+
+        <div class="profile-nav-section">
+            <div class="profile-nav-section-title">Account</div>
+            <a href="/my-profile" class="profile-nav-link {% if active_page == 'profile' %}active{% endif %}">
+                <i class="fas fa-user"></i>
+                My Profile
+            </a>
+            <a href="/my-profile/details" class="profile-nav-link {% if active_page == 'details' %}active{% endif %}">
+                <i class="fas fa-id-card"></i>
+                Profile Details
+            </a>
+            <a href="/my-profile/details/my-addresses" class="profile-nav-link {% if active_page == 'addresses' %}active{% endif %}">
+                <i class="fas fa-map-marker-alt"></i>
+                My Addresses
+            </a>
+        </div>
+
+        <div class="profile-nav-section">
+            <div class="profile-nav-section-title">Reviews & Feedback</div>
+            <a href="/my-reviews" class="profile-nav-link {% if active_page == 'reviews' %}active{% endif %}">
+                <i class="fas fa-star"></i>
+                My Reviews
+            </a>
+            <a href="/my-comments" class="profile-nav-link {% if active_page == 'comments' %}active{% endif %}">
+                <i class="fas fa-comments"></i>
+                My Comments
+            </a>
+        </div>
+
+        <div class="profile-nav-section">
+            <div class="profile-nav-section-title">Settings</div>
+            <a href="/my-profile/settings" class="profile-nav-link {% if active_page == 'settings' %}active{% endif %}">
+                <i class="fas fa-cog"></i>
+                Account Settings
+            </a>
+            <a href="/my-profile/notifications" class="profile-nav-link {% if active_page == 'notifications' %}active{% endif %}">
+                <i class="fas fa-bell"></i>
+                Notifications
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+function updateArrows(sliderId) {
+    const slider = document.getElementById(sliderId);
+    const leftArrow = document.getElementById(sliderId.replace('Slider', 'LeftArrow'));
+    const rightArrow = document.getElementById(sliderId.replace('Slider', 'RightArrow'));
+    
+    // Calculate the maximum scroll position
+    const maxScroll = slider.scrollWidth - slider.clientWidth;
+    
+    if (leftArrow) {
+        leftArrow.style.display = slider.scrollLeft > 5 ? 'block' : 'none';
+    }
+    
+    if (rightArrow) {
+        rightArrow.style.display = Math.ceil(slider.scrollLeft) < maxScroll - 5 ? 'block' : 'none';
+    }
+}
+
+function slideProducts(direction, sliderId) {
+    const slider = document.getElementById(sliderId);
+    const slideWidth = 270; // Width of one product slide (250px) + margin (20px)
+    
+    // Calculate the number of products that can be fully visible
+    const visibleWidth = slider.clientWidth;
+    const productsPerView = Math.floor(visibleWidth / slideWidth);
+    
+    // Calculate the exact scroll amount to show new products
+    const scrollAmount = slideWidth * productsPerView;
+    
+    // Disable buttons during animation
+    const buttons = document.querySelectorAll('.slider-arrow');
+    buttons.forEach(button => button.style.pointerEvents = 'none');
+    
+    // Get current scroll position
+    const currentScroll = slider.scrollLeft;
+    let targetScroll;
+    
+    if (direction === 'left') {
+        // Scroll back by the width of visible products
+        targetScroll = Math.max(0, currentScroll - scrollAmount);
+    } else {
+        // Scroll forward by the width of visible products
+        const maxScroll = slider.scrollWidth - slider.clientWidth;
+        targetScroll = Math.min(maxScroll, currentScroll + scrollAmount);
+    }
+    
+    slider.scrollTo({
+        left: targetScroll,
+        behavior: 'smooth'
+    });
+    
+    // Update arrows and re-enable buttons after animation
+    setTimeout(() => {
+        updateArrows(sliderId);
+        buttons.forEach(button => button.style.pointerEvents = 'auto');
+    }, 500);
+}
+
+// Initialize arrows on load and add scroll event listener with debounce
+document.addEventListener('DOMContentLoaded', function() {
+    const sliders = ['recentSlider', 'purchasedSlider'];
+    
+    let scrollTimeout;
+    const handleScroll = (sliderId) => {
+        if (scrollTimeout) {
+            clearTimeout(scrollTimeout);
+        }
+        scrollTimeout = setTimeout(() => {
+            updateArrows(sliderId);
+        }, 150);
+    };
+    
+    sliders.forEach(sliderId => {
+        const slider = document.getElementById(sliderId);
+        if (slider) {
+            // Initial arrow update
+            updateArrows(sliderId);
+            
+            // Add scroll event listener
+            slider.addEventListener('scroll', () => handleScroll(sliderId));
+            
+            // Add resize event listener to handle window size changes
+            window.addEventListener('resize', () => {
+                handleScroll(sliderId);
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

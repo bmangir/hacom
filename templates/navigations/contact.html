@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Contact - HACOM</title>
+  <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: url("{{ url_for('static', filename='images/background.jpg') }}") no-repeat;
+            background-size: cover;
+            background-position: center;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1;
+        }
+
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px 100px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 99;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .logo {
+            font-size: 4em;
+            color: #fff;
+            user-select: none;
+            text-decoration: none;
+            transition: color 0.3s ease;
+            z-index: 2;
+        }
+
+        .logo:hover {
+            color: #00C4FF;
+        }
+
+        .navigation {
+            display: flex;
+            align-items: center;
+            z-index: 2;
+        }
+
+        .navigation a {
+            position: relative;
+            font-size: 1.1em;
+            color: #fff;
+            text-decoration: none;
+            font-weight: 500;
+            margin-left: 40px;
+        }
+
+        .navigation a::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            bottom: -6px;
+            width: 100%;
+            height: 3px;
+            background: #fff;
+            border-radius: 5px;
+            transform: scaleX(0);
+            transition: transform .5s;
+        }
+
+        .navigation a:hover::after {
+            transform: scaleX(1);
+        }
+
+        .navigation .btnLogin-popup {
+            width: 130px;
+            height: 50px;
+            background: transparent;
+            border: 2px solid #fff;
+            outline: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.1em;
+            color: #fff;
+            font-weight: 400;
+            margin-left: 40px;
+            transition: .5s;
+        }
+
+        .navigation .btnLogin-popup:hover {
+            background: #fff;
+            color: #162938;
+        }
+
+        .content-container {
+            color: #fff;
+            text-align: center;
+            z-index: 2;
+            position: relative;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 50px;
+            border-radius: 10px;
+            max-width: 800px;
+        }
+
+        .content-container h2 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+
+        .content-container p {
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            color: #fff;
+        }
+
+        .content-container a {
+            color: #00C4FF;
+            text-decoration: none;
+            font-weight: bold;
+            transition: color 0.3s ease;
+        }
+
+        .content-container a:hover {
+            color: #fff;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+<header>
+  <a href="/" class="logo">HACOM</a>
+  <nav class="navigation">
+    <a href="/home">Home</a>
+    <a href="/about">About</a>
+    <a href="/help">Help</a>
+    <a href="/contact">Contact</a>
+    <button class="btnLogin-popup" onclick="window.location.href='/login'">Login</button>
+  </nav>
+</header>
+
+<div class="content-container">
+  <h2>Contact Us</h2>
+  <p>Email us at:</p>
+  <p><a href="mailto:berkantmangir303@gmail.com">yourname@example.com</a></p>
+  <p>Or call us at:</p>
+  <p><a href="tel:+123456789">+123 456 789</a></p>
+</div>
+
+</body>
+</html>
