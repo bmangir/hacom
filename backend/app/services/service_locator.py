@@ -1,0 +1,5 @@
+from app.services.item_recommendation_service import ItemRecommendationService
+from app.services.user_recommendation_service import UserRecommendationService
+
+ITEM_RECOMMENDATION_SERVICE = ItemRecommendationService()
+USER_RECOMMENDATION_SERVICE = UserRecommendationService()
