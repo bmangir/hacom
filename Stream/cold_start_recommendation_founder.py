@@ -1,33 +1,23 @@
 import json
 
 from flask import Flask, request
-from pyspark.sql import Window
 from pyspark.sql.functions import *
-from pyspark.sql.types import FloatType, IntegerType, MapType, DoubleType
+from pyspark.sql.types import FloatType, IntegerType, DoubleType
 
-from Batch.UserBatchProcess import utility
 from Batch.UserBatchProcess.utility import vectorize
 from config import USER_FEATURES_HOST, MONGO_AGG_DATA_DB
-from utilities.spark_utility import create_spark_session, read_postgres_table, store_df_to_mongodb
+from utilities.spark_utility import create_spark_session, store_df_to_mongodb
 from utilities.pinecone_utility import store_to_pinecone
 
 app = Flask(__name__)
 
 spark = create_spark_session("computer_registration")
 
-users_df = read_postgres_table(spark, "users")
 
 @app.route("/api/v1/stream/new_registration_computer", methods=["POST"])
 def generate_agg_data_and_vector_of_new_user():
-    print("IM HERE")
     user_json = request.get_json()
     user_info = spark.read.json(spark.sparkContext.parallelize([json.dumps(user_json)]))
-    user_info.show()
-
-    #user_info = users_df.filter(col("user_id") == "U18").select("user_id", "gender", "birth_date", "address")
-    #user_info = user_info.withColumn("age",
-    #                                 round(datediff(current_date(), col("birth_date")) / 365, 0).cast(IntegerType())
-    #                                 ).drop("birth_date").withColumnRenamed("address", "location").withColumn("winter", lit(0)) \
 
     user_info = user_info \
         .withColumn("winter", lit(0)) \
@@ -50,10 +40,10 @@ def generate_agg_data_and_vector_of_new_user():
         .withColumn("total_sessions", lit(0)) \
         .withColumn("recently_viewed_products", lit([])) \
         .withColumn("categories", lit([])) \
-        .withColumn("products", lit([]))\
-        .withColumn("recently_view_durations", lit([]))\
-        .withColumn("avg_product_view_duration", lit([]))\
-        .withColumn("avg_category_view_duration", lit([]))\
+        .withColumn("products", lit([])) \
+        .withColumn("recently_view_durations", lit([])) \
+        .withColumn("avg_product_view_duration", lit([])) \
+        .withColumn("avg_category_view_duration", lit([])) \
         .withColumn("overall_avg_category_view_duration", lit(0.0)) \
         .withColumn("overall_avg_product_view_duration", lit(0.0)) \
         .withColumn("total_views", lit(0)) \
@@ -64,16 +54,16 @@ def generate_agg_data_and_vector_of_new_user():
         .withColumn("total_spent", lit(0.0)) \
         .withColumn("avg_order_value", lit(0.0)) \
         .withColumn("avg_orders_per_month", lit(0)) \
-        .withColumn("recently_purchased_products", lit([]))\
-        .withColumn("recent_purchase_counts", lit([]))\
-        .withColumn("recent_purchase_amounts", lit([]))\
-        .withColumn("seasonal_data", map_from_seasons)\
+        .withColumn("recently_purchased_products", lit([])) \
+        .withColumn("recent_purchase_counts", lit([])) \
+        .withColumn("recent_purchase_amounts", lit([])) \
+        .withColumn("seasonal_data", map_from_seasons) \
         .withColumn("most_purchased_brands", lit([])) \
         .withColumn("avg_review_rating", lit(0.0)) \
         .withColumn("review_count", lit(0)) \
         .withColumn("avg_rating_per_category", lit([])) \
         .withColumn("avg_view_duration", lit(0)) \
-        .withColumn("total_impressions", lit(0)) \
+        .withColumn("total_impressions", lit(0))
 
     user_info = user_info \
         .withColumn("user_profile",
@@ -87,26 +77,26 @@ def generate_agg_data_and_vector_of_new_user():
                         coalesce("session_counts_last_30_days", lit(0)).alias("session_counts_last_30_days"),
                         coalesce("avg_session_duration_sec", lit(0.0)).alias("avg_session_duration_sec"),
                         coalesce("total_sessions", lit(0)).alias("total_sessions"))
-        ).withColumn(
-            "browsing_behavior",
+                    ).withColumn(
+        "browsing_behavior",
+        struct(
             struct(
-                struct(
-                    coalesce("recently_viewed_products", lit([])).cast(ArrayType(StringType())).alias("recently_viewed_products"),
-                    coalesce("categories", lit([])).cast(ArrayType(StringType())).alias("categories"),
-                    coalesce("products", lit([])).cast(ArrayType(StringType())).alias("products"),
-                    coalesce("recently_view_durations", lit([])).cast(ArrayType(FloatType())).alias("recently_view_durations"),
-                    coalesce("avg_product_view_duration", lit([])).cast(ArrayType(FloatType())).alias("avg_product_view_duration"),
-                    coalesce("avg_category_view_duration", lit([])).cast(ArrayType(FloatType())).alias("avg_category_view_duration"),
-                    coalesce("overall_avg_category_view_duration", lit(0.0)).alias("overall_avg_category_view_duration"),
-                    coalesce("overall_avg_product_view_duration", lit(0.0)).alias("overall_avg_product_view_duration"),
-                ).alias("freq_views"),
-                coalesce("total_views", lit(0)).alias("total_views"),
-                coalesce("total_clicks", lit(0)).alias("total_clicks"),
-                coalesce("total_add_to_cart", lit(0)).alias("total_add_to_cart"),
-                coalesce("total_add_to_wishlist", lit(0)).alias("total_add_to_wishlist"),
-            )
-        ).withColumn(
-            "purchase_behavior",
+                coalesce("recently_viewed_products", lit([])).cast(ArrayType(StringType())).alias("recently_viewed_products"),
+                coalesce("categories", lit([])).cast(ArrayType(StringType())).alias("categories"),
+                coalesce("products", lit([])).cast(ArrayType(StringType())).alias("products"),
+                coalesce("recently_view_durations", lit([])).cast(ArrayType(FloatType())).alias("recently_view_durations"),
+                coalesce("avg_product_view_duration", lit([])).cast(ArrayType(FloatType())).alias("avg_product_view_duration"),
+                coalesce("avg_category_view_duration", lit([])).cast(ArrayType(FloatType())).alias("avg_category_view_duration"),
+                coalesce("overall_avg_category_view_duration", lit(0.0)).alias("overall_avg_category_view_duration"),
+                coalesce("overall_avg_product_view_duration", lit(0.0)).alias("overall_avg_product_view_duration"),
+            ).alias("freq_views"),
+            coalesce("total_views", lit(0)).alias("total_views"),
+            coalesce("total_clicks", lit(0)).alias("total_clicks"),
+            coalesce("total_add_to_cart", lit(0)).alias("total_add_to_cart"),
+            coalesce("total_add_to_wishlist", lit(0)).alias("total_add_to_wishlist"),
+        )
+    ).withColumn(
+        "purchase_behavior",
         struct(
             coalesce(col("total_purchase").cast(IntegerType()), lit(0)).alias("total_purchase"),
             coalesce(col("total_spent").cast(DoubleType()), lit(0.0)).alias("total_spent"),
@@ -117,23 +107,23 @@ def generate_agg_data_and_vector_of_new_user():
             coalesce(col("recent_purchase_amounts").cast(ArrayType(DoubleType())), lit([])).alias("recent_purchase_amounts"),
             col("seasonal_data")
         )
-        ).withColumn("product_preferences",
-            struct(
-                coalesce("most_purchased_brands", lit([])).cast(ArrayType(StringType())).alias("most_purchased_brands"),
-                coalesce("avg_review_rating", lit(0.0)).alias("avg_review_rating"),
-                coalesce("review_count", lit(0)).alias("review_count"),
-                coalesce("avg_rating_per_category", lit([])).cast(ArrayType(FloatType())).alias("avg_rating_per_category"),
-            )
-        ).withColumn("ctr", lit(0.0)
-        ).withColumn("loyalty_score", lit(0.0)
-        ).withColumn("engagement_score", lit(0.0)
-        ).withColumn("preference_stability", lit(0.0)
-        ).withColumn("price_sensitivity", lit(0.0)
-        ).withColumn("category_exploration", lit(0.0)
-        ).withColumn("brand_loyalty", lit(0.0))\
-    .select("user_id", "user_profile", "browsing_behavior", "purchase_behavior", "product_preferences", "ctr", "loyalty_score",
-            "engagement_score", "preference_stability", "price_sensitivity", "category_exploration", "brand_loyalty", "total_impressions",
-            "avg_view_duration")
+    ).withColumn("product_preferences",
+                 struct(
+                     coalesce("most_purchased_brands", lit([])).cast(ArrayType(StringType())).alias("most_purchased_brands"),
+                     coalesce("avg_review_rating", lit(0.0)).alias("avg_review_rating"),
+                     coalesce("review_count", lit(0)).alias("review_count"),
+                     coalesce("avg_rating_per_category", lit([])).cast(ArrayType(FloatType())).alias("avg_rating_per_category"),
+                 )
+                 ).withColumn("ctr", lit(0.0)
+                              ).withColumn("loyalty_score", lit(0.0)
+                                           ).withColumn("engagement_score", lit(0.0)
+                                                        ).withColumn("preference_stability", lit(0.0)
+                                                                     ).withColumn("price_sensitivity", lit(0.0)
+                                                                                  ).withColumn("category_exploration", lit(0.0)
+                                                                                               ).withColumn("brand_loyalty", lit(0.0)) \
+        .select("user_id", "user_profile", "browsing_behavior", "purchase_behavior", "product_preferences", "ctr", "loyalty_score",
+                "engagement_score", "preference_stability", "price_sensitivity", "category_exploration", "brand_loyalty", "total_impressions",
+                "avg_view_duration")
 
 
     vectorize_udf = udf(vectorize, ArrayType(FloatType()))
