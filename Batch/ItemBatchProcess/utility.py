@@ -3,7 +3,6 @@ import numpy
 import torch
 from nltk.sentiment import SentimentIntensityAnalyzer
 from pyspark.sql.functions import *
-from pyspark.sql.types import FloatType
 from pyspark.sql.dataframe import DataFrame
 from sentence_transformers import SentenceTransformer
 from sklearn.preprocessing import MinMaxScaler

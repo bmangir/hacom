@@ -8,8 +8,7 @@ from pyspark.sql.types import FloatType, MapType, Row
 
 from config import MONGO_PRODUCTS_DB, client, ITEM_FEATURES_HOST, ITEM_CONTENTS_HOST
 from Batch.models import item_model as ItemModel
-from utility import analyze_sentiment, _create_product_contents, vectorize_item_features, vectorize_item_contents, \
-    distribution_of_df_by_range, _extract_details_column
+import utility
 from utilities.spark_utility import create_spark_session
 
 
@@ -31,8 +30,8 @@ class ItemBatchService:
 
         self.preprocess_data()
 
-    def preprocess_data(self, range=10):
-        sentiment_udf = udf(analyze_sentiment, FloatType())
+    def preprocess_data(self):
+        sentiment_udf = udf(utility.analyze_sentiment, FloatType())
         self.reviews_df = self.reviews_df.withColumn("sentiment_score", sentiment_udf(col("review_text")))
         self.orders_df = self.orders_df.withColumn("order_date_as_day",
                                                    date_format(from_unixtime(col("order_date") / 1000), "yyyy-MM-dd")) \
@@ -70,7 +69,6 @@ class ItemBatchService:
         purchase_counts = purchase_counts.fillna({"purchase_count": 0})
 
         # Avg Rating, Review Count
-        # last_30_days_reviews_dy = self.reviews_df.filter(col("review_date") >= date_sub(current_date(), 30))
         avg_rating_and_review_count = self.reviews_df.groupBy("review_product_id") \
             .agg(avg("rating").alias("avg_rating"),
                  count("*").alias("review_count")) \
@@ -134,7 +132,7 @@ class ItemBatchService:
                         value = details[field]
                         if value:
                             metadata[field.lower()] = str(value).lower() if isinstance(value, str) else value
-                elif isinstance(details, str): # JSON string kontrolü (opsiyonel, struct ise gerekmeyebilir)
+                elif isinstance(details, str):
                     try:
                         details_dict = json.loads(details)
                         if isinstance(details_dict, dict):
@@ -142,7 +140,7 @@ class ItemBatchService:
                                 if v:
                                     metadata[k.lower()] = str(v).lower() if isinstance(v, str) else v
                     except json.JSONDecodeError:
-                        print(f"Uyarı: 'details' sütunu geçerli bir JSON stringi değil: {details}")
+                        print("ERROR in item batch jsonDecodeError!")
 
             return metadata
 
@@ -178,7 +176,7 @@ class ItemBatchService:
         """Textual and Visual Representations"""
 
         contents_of_products = self.products_df.drop("stock_quantity", "rating", "image_url", "author")
-        detailed_products_df = _extract_details_column(contents_of_products.select("details", "product_id")).select(
+        detailed_products_df = utility._extract_details_column(contents_of_products.select("details", "product_id")).select(
             "details", "product_id")
         contents_of_products = contents_of_products \
             .withColumn("colors",
@@ -202,8 +200,6 @@ class ItemBatchService:
         """Engagement & Demand Metrics"""
 
         # Purchase count
-        last_30_days_purchases_df = self.orders_df.filter(
-            col("order_date") >= int((datetime.now() - timedelta(days=30)).timestamp() * 1000))
         purchase_counts = self.orders_df.groupBy("order_product_id") \
             .agg(count("*").alias("purchase_count")) \
             .withColumnRenamed("order_product_id", "product_id")
@@ -316,10 +312,9 @@ class ItemBatchService:
         return final_df
 
     def _get_temporal_dynamics(self, daily_sales_df: DataFrame):
-        seven_day_window_spec = Window.partitionBy("product_id").orderBy("order_date").rowsBetween(-6,
-                                                                                                   0)  # 7-day window
-        thirty_day_window_spec = Window.partitionBy("product_id").orderBy("order_date").rowsBetween(-29,
-                                                                                                    0)  # 30-day window
+        # Calculate 7-day and 30-day sales trends
+        seven_day_window_spec = Window.partitionBy("product_id").orderBy("order_date").rowsBetween(-6, 0)
+        thirty_day_window_spec = Window.partitionBy("product_id").orderBy("order_date").rowsBetween(-29, 0)
 
         daily_sales_trend_df = daily_sales_df \
             .withColumn("7_day_trend", sum("daily_units_sold").over(seven_day_window_spec)) \
@@ -423,14 +418,13 @@ class ItemBatchService:
         purchases_agg = self.orders_df.groupBy("order_product_id").agg(count("*").alias("total_purchases"))
         purchases_agg = purchases_agg.withColumn("total_purchases",
                                                  coalesce(col("total_purchases"), lit(0))).withColumnRenamed(
-            "order_product_id", "product_id")
+                                                 "order_product_id", "product_id")
 
         views_agg = self.browsing_df \
             .groupBy("product_id") \
             .agg(count("*").alias("total_views"))
-        views_agg = self.product_ids_df.join(views_agg, "product_id", "left").withColumn("total_views",
-                                                                                         coalesce(col("total_views"),
-                                                                                                  lit(0)))
+        views_agg = self.product_ids_df.join(views_agg, "product_id", "left")\
+                                       .withColumn("total_views", coalesce(col("total_views"), lit(0)))
 
         trending_df = views_agg.join(purchases_agg, on="product_id", how="outer") \
             .join(searches_agg, on="product_id", how="outer")
@@ -503,13 +497,6 @@ class ItemBatchService:
 
         return final_df
 
-    def define_item_contents(self, basic_item_info_df, content_df):
-        item_content_df = basic_item_info_df.join(content_df, "product_id", "left")
-
-        item_content_df = _create_product_contents(item_content_df)
-
-        return item_content_df.select("product_id", "content", "metadata")
-
     def _get_price_elasticity(self):
         """Calculate price elasticity based on price changes and sales volume"""
         price_changes = self.orders_df.groupBy("order_product_id") \
@@ -518,38 +505,38 @@ class ItemBatchService:
                 avg("price").alias("avg_price"),
                 count("*").alias("total_orders")
             )
-        
+
         sales_volume = self.orders_df.groupBy("order_product_id") \
             .agg(count("*").alias("total_sales"))
-        
+
         elasticity = price_changes.join(sales_volume, "order_product_id") \
-            .withColumn("price_elasticity", 
-                when(col("price_std") > 0, 
+            .withColumn("price_elasticity",
+                when(col("price_std") > 0,
                     (col("total_sales") / col("total_orders")) / (col("price_std") / col("avg_price"))
                 ).otherwise(0)
             )
 
         elasticity = self.product_ids_df.join(elasticity, self.product_ids_df.product_id == elasticity.order_product_id, "left") \
             .withColumn("price_elasticity", coalesce(col("price_elasticity"), lit(0.0)))
-        
+
         return elasticity.select("product_id", "price_elasticity")
 
     def _get_competitor_analysis(self):
         """Analyze product's position relative to competitors"""
         category_avg_price = self.products_df.groupBy("category") \
             .agg(avg("price").alias("category_avg_price"))
-        
+
         category_avg_rating = self.reviews_df.groupBy("review_product_id") \
             .agg(avg("rating").alias("avg_rating")) \
-            .join(self.products_df.select("product_id", "category"), 
+            .join(self.products_df.select("product_id", "category"),
                   col("review_product_id") == col("product_id")) \
             .groupBy("category") \
             .agg(avg("avg_rating").alias("category_avg_rating"))
-        
+
         competitor_analysis = self.products_df \
             .join(category_avg_price, "category") \
             .join(category_avg_rating, "category") \
-            .withColumn("price_competitiveness", 
+            .withColumn("price_competitiveness",
                 when(col("price") <= col("category_avg_price"), 1.0)
                 .otherwise(0.5)
             ) \
@@ -563,7 +550,7 @@ class ItemBatchService:
 
         competitor_analysis = self.product_ids_df.join(competitor_analysis, "product_id", "left") \
             .withColumn("competitor_analysis", coalesce(col("competitor_analysis"), lit(0.0)))
-        
+
         return competitor_analysis.select("product_id", "competitor_analysis")
 
     def _get_content_quality_score(self):
@@ -575,7 +562,7 @@ class ItemBatchService:
                 avg("review_length").alias("avg_review_length"),
                 count("*").alias("review_count")
             )
-        
+
         content_quality = self.products_df \
             .join(review_quality, col("product_id") == col("review_product_id"), "left") \
             .withColumn("content_quality_score",
@@ -595,7 +582,7 @@ class ItemBatchService:
             .filter(col("order_timestamp") >= current_timestamp() - expr(f"INTERVAL {sales_period} DAYS")) \
             .groupBy("order_product_id") \
             .agg(count("*").alias("sales_volume"))
-        
+
         inventory_turnover = self.products_df \
             .join(sales_volume, col("product_id") == col("order_product_id"), "left") \
             .withColumn("inventory_turnover",
@@ -613,11 +600,11 @@ class ItemBatchService:
         """Calculate product return rate"""
         total_orders = self.orders_df.groupBy("order_product_id") \
             .agg(count("*").alias("total_orders"))
-        
+
         returns = self.orders_df.filter(col("status") == "returned") \
             .groupBy("order_product_id") \
             .agg(count("*").alias("return_count"))
-        
+
         return_rate = total_orders.join(returns, "order_product_id", "left") \
             .withColumn("return_rate",
                 when(col("total_orders") > 0,
@@ -627,13 +614,13 @@ class ItemBatchService:
 
         return_rate = self.product_ids_df.join(return_rate, self.product_ids_df.product_id == return_rate.order_product_id, "left") \
             .withColumn("return_rate", coalesce(col("return_rate"), lit(0.0)))
-        
+
         return return_rate.select("product_id", "return_rate")
 
     def _get_customer_satisfaction_score(self):
         """Calculate customer satisfaction score based on reviews and ratings"""
         review_sentiment = self.reviews_df \
-            .withColumn("sentiment_score", 
+            .withColumn("sentiment_score",
                 when(col("rating") >= 4, 1.0)
                 .when(col("rating") >= 3, 0.7)
                 .when(col("rating") >= 2, 0.4)
@@ -644,8 +631,14 @@ class ItemBatchService:
 
         review_sentiment = self.product_ids_df.join(review_sentiment, self.product_ids_df.product_id == review_sentiment.review_product_id, "left") \
             .withColumn("customer_satisfaction_score", coalesce(col("customer_satisfaction_score"), lit(0.0)))
-        
+
         return review_sentiment.select("product_id", "customer_satisfaction_score")
+
+    def define_item_contents(self, basic_item_info_df, content_df):
+        item_content_df = basic_item_info_df.join(content_df, "product_id", "left")
+        item_content_df = utility._create_product_contents(item_content_df)
+
+        return item_content_df.select("product_id", "content", "metadata")
 
     def define_item_profile(self):
         basic_item_information = self._get_basic_item_information()
@@ -655,8 +648,7 @@ class ItemBatchService:
         user_item_interaction_df = self._get_user_item_interaction_features()
         top_n_products_by_cat = self._get_category_based_products(top_n=10)
         seasonal_and_trend_based_df = self._get_seasonal_and_trend_based_features()
-        
-        # New features
+
         price_elasticity_df = self._get_price_elasticity()
         competitor_analysis_df = self._get_competitor_analysis()
         content_quality_score_df = self._get_content_quality_score()
@@ -669,7 +661,7 @@ class ItemBatchService:
 
         item_content_df = self.define_item_contents(basic_item_information, content_df)
         item_content_df = item_content_df.withColumn("agg_time", (unix_timestamp(current_timestamp()) * 1000))
-        distributed_content_df = distribution_of_df_by_range(item_content_df, range=1)
+        distributed_content_df = utility.distribution_of_df_by_range(item_content_df, range=1)
 
         top_n_products_by_cat = top_n_products_by_cat.withColumn("agg_time", (unix_timestamp(current_timestamp()) * 1000))
 
@@ -686,7 +678,7 @@ class ItemBatchService:
             .join(customer_satisfaction_score_df, "product_id", "left") \
             .withColumn("agg_time", (unix_timestamp(current_timestamp()) * 1000))
 
-        distributed_features_df = distribution_of_df_by_range(transformed_features_df, range=1)
+        distributed_features_df = utility.distribution_of_df_by_range(transformed_features_df, range=1)
 
         return distributed_content_df, top_n_products_by_cat, distributed_features_df
 
@@ -696,22 +688,14 @@ class ItemBatchService:
         content_vector_df = self.vectorize_contents(agg_contents_df)
 
         # Store the vectors in Pinecone, vector database
-        start = datetime.now()
         ItemModel.store_vectors(feature_vector_df, index_host=ITEM_FEATURES_HOST)
         ItemModel.store_vectors(content_vector_df, index_host=ITEM_CONTENTS_HOST)
-        end = datetime.now()
-        print(end - end)
 
     def vectorize_contents(self, agg_contents_df: DataFrame) -> DataFrame | None:
-        if agg_contents_df is None:
-            return None
-
         vectorize_udf = udf(
-            lambda content: vectorize_item_contents({"content": content}) if content else [],
+            lambda content: utility.vectorize_item_contents({"content": content}) if content else [],
             ArrayType(FloatType())
         )
-
-        # Apply the UDF to add a new column with embeddings
         vectorized_df = agg_contents_df \
             .withColumn("values", vectorize_udf(col("content"))) \
             .withColumnRenamed("product_id", "id")
@@ -719,11 +703,7 @@ class ItemBatchService:
         return vectorized_df.select("id", "values", "metadata")
 
     def vectorize_features(self, agg_features_df: DataFrame) -> DataFrame | None:
-        if agg_features_df is None:
-            return None
-
-        vectorize_udf = udf(vectorize_item_features, ArrayType(FloatType()))
-
+        vectorize_udf = udf(utility.vectorize_item_features, ArrayType(FloatType()))
         vectorized_df = agg_features_df \
             .withColumn("values", vectorize_udf(
                 col("purchase_count"), col("view_count"), col("wishlist_count"), col("cart_addition_count"),
@@ -743,18 +723,12 @@ class ItemBatchService:
     def start(self):
         distributed_content_df, top_products_based_cat_df, distributed_features_df = self.define_item_profile()
 
-        # Store them in HDFS, store top_products to MongoDB
         ItemModel.store_agg_data_to_mongodb(top_products_based_cat_df, "top_n_products_by_category")
         ItemModel.store_agg_data_to_mongodb(distributed_content_df.drop("product_num", "product_range", "metadata"), "item_contents")
         ItemModel.store_agg_data_to_mongodb(distributed_features_df.drop("product_num", "product_range", "metadata"), "item_features")
 
         self.start_vectorization(distributed_features_df, distributed_content_df)
-
         self.stop()
 
     def stop(self):
         print("IT'S DONE")
-
-
-ibs = ItemBatchService()
-ibs.start()
