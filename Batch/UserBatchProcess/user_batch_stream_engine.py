@@ -6,7 +6,7 @@ from pyspark.sql.functions import *
 from pyspark.sql.types import FloatType
 
 from Batch.models import user_model as UserModel
-from utility import extract_place_name, transform_data, distribution_of_df_by_range, vectorize
+import utility
 from utilities.spark_utility import create_spark_session
 
 user_feature_ext_sj = create_spark_session(app_name="user-features-extraction-job")
@@ -30,7 +30,7 @@ class UserBatchService:
         self.preprocess_data()
 
     def preprocess_data(self):
-        extract_place_name_udf = udf(extract_place_name, StringType())
+        extract_place_name_udf = udf(utility.extract_place_name, StringType())
         self.users_df = self.users_df \
             .withColumn("age", (datediff(current_date(), col("birth_date")) / 365).cast("int")) \
             .withColumn("location", extract_place_name_udf(col("address"))) \
@@ -82,7 +82,6 @@ class UserBatchService:
             .agg(count("session_id").alias("session_counts_last_30_days")) \
             .join(self.users_ids_df, "user_id", "right") \
             .fillna({"session_counts_last_30_days": 0})
-        #session_count_last_30_days = self.users_ids_df.join(session_count_last_30_days, "user_id", "left").fillna({"session_counts_last_30_days": 0})
 
         session_duration_stats = self.session_df \
             .groupBy("user_id") \
@@ -90,9 +89,6 @@ class UserBatchService:
                  count("*").alias("total_sessions")) \
             .join(self.users_ids_df, "user_id", "right") \
             .fillna({"avg_session_duration_sec": 0.0, "total_sessions": 0})
-        #avg_session_duration_all_history = self.users_ids_df.join(avg_session_duration_all_history, "user_id", "left").fillna({"avg_session_duration_sec": 0.0})
-
-        #user_session_stats = session_count_last_30_days.join(avg_session_duration_all_history, "user_id", "left")
 
         # Convert session duration to seconds for readability
         user_demographics_df = self.users_df \
@@ -292,7 +288,7 @@ class UserBatchService:
             .agg(round(avg("orders_per_month"), 2).alias("avg_orders_per_month"))
         avg_order_freq_monthly = self.users_ids_df.join(avg_order_freq_monthly, "user_id", "left").fillna({"avg_orders_per_month": 0.0})
 
-        # Calculcate Seasonal data
+        # Calculate Seasonal data
         seasonal_orders = temp_orders_df.groupBy("user_id", "season") \
             .agg(count("*").alias("orders_per_season"))
 
@@ -323,7 +319,6 @@ class UserBatchService:
             "seasonal_data",
             coalesce(col("seasonal_data"), default_seasonal)
         )
-
 
         final_df = total_purchases \
             .join(avg_order_value, "user_id", "right") \
@@ -599,11 +594,6 @@ class UserBatchService:
         
         return brand_loyalty.select("user_id", "brand_loyalty")
 
-    def _get_search_activity(self):
-        # TODO: integrate this later
-        total_searches = self.searches_df.groupBy("user_id") \
-            .agg(count("*").alias("total_searches"))
-
     def define_user_features(self):
         user_profile = self._get_user_profile()
         browsing_behavior = self._get_browsing_behavior()
@@ -611,7 +601,7 @@ class UserBatchService:
         product_preferences = self._get_product_preferences()
         ctr_df = self._get_ctr()
         
-        # New features
+        # Score features
         loyalty_score_df = self._get_loyalty_score()
         engagement_score_df = self._get_engagement_score()
         preference_stability_df = self._get_preference_stability()
@@ -619,9 +609,8 @@ class UserBatchService:
         category_exploration_df = self._get_category_exploration()
         brand_loyalty_df = self._get_brand_loyalty()
 
-        transformed_df = transform_data(user_profile, browsing_behavior, purchase_behavior, product_preferences, ctr_df)
-        
-        # Join new features
+        transformed_df = utility.transform_data(user_profile, browsing_behavior, purchase_behavior, product_preferences, ctr_df)
+
         transformed_df = transformed_df \
             .join(loyalty_score_df, "user_id", "left") \
             .join(engagement_score_df, "user_id", "left") \
@@ -630,14 +619,11 @@ class UserBatchService:
             .join(category_exploration_df, "user_id", "left") \
             .join(brand_loyalty_df, "user_id", "left")
         
-        distributed_df = distribution_of_df_by_range(transformed_df, 1)
+        distributed_df = utility.distribution_of_df_by_range(transformed_df, 1)
         return distributed_df
 
-    def vectorize(self, agg_df: DataFrame) -> DataFrame | None:
-        vectorize_udf = udf(vectorize, ArrayType(FloatType()))
-
-        if agg_df is None:
-            return None
+    def vectorize(self, agg_df: DataFrame) -> DataFrame:
+        vectorize_udf = udf(utility.vectorize, ArrayType(FloatType()))
 
         vectorized_df = agg_df.withColumn(
             "values",
@@ -651,28 +637,14 @@ class UserBatchService:
         return vectorized_df.withColumnRenamed("user_id", "id").select("id", "values")
 
     def start_vectorization(self, agg_df):
-        vectorized_agg_df = self.vectorize(agg_df)  # Vectorize df
+        vectorized_agg_df = self.vectorize(agg_df)
         UserModel.store_vectors(vectorized_agg_df)
 
     def start(self):
         distributed_df = self.define_user_features().cache()
-        a = distributed_df.limit(1).toJSON().collect()
-        print(a)
-
-        # Store data in Mongo and HDFS for further usages
         UserModel.store_agg_data_to_mongodb(distributed_df.drop("user_num", "user_range"))
-
         self.start_vectorization(distributed_df)
-
-        # TODO: find recc item from similar users
-        # TODO: store them in mongodb
-        # TODO: for start the recommendation
         self.stop()
 
     def stop(self):
         print("IT'S DONE")
-
-start = datetime.now()
-ubs = UserBatchService()
-ubs.start()
-print(datetime.now() - start)

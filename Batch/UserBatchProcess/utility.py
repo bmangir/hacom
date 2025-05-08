@@ -61,9 +61,6 @@ def vectorize(ctr, user_profile, browsing_behavior, purchase_behavior, product_p
 
     num_features = [float(x) for x in num_features]
 
-    # Normalize Numeric Features
-    #norm_num_features = scaler.fit_transform(np.array(num_features).reshape(1, -1)).flatten()
-
     # Convert List-Based Features into Embeddings
     categories_vector = model.encode(
         " ".join(browsing_behavior["freq_views"]["categories"])) if "freq_views" in browsing_behavior else np.zeros(384)
@@ -102,16 +99,8 @@ def vectorize(ctr, user_profile, browsing_behavior, purchase_behavior, product_p
 
 
 def extract_place_name(address):
+    # TODO: search for this to find the address
     return "NaN"
-    # try:
-    #    data = usaddress.tag(address)
-    #    for item in data[0]:  # Iterate through the tagged components
-    #        if item[1] == "PlaceName":
-    #            return item[0]
-    #    return "NaN"
-    # except Exception as e:
-    #    print(f"Error parsing address: {address}. Error: {e}")
-    #    return "NaN"  # Return "NaN" on error
 
 
 def transform_data(user_profile: DataFrame, browsing_behavior: DataFrame,
@@ -136,13 +125,10 @@ def transform_data(user_profile: DataFrame, browsing_behavior: DataFrame,
     )
 
     browsing_behavior_struct = struct(
-        # Top-level fields (total_clicks, etc.)
         coalesce(col("total_clicks"), lit(0)).alias("total_clicks"),
         coalesce(col("total_views"), lit(0)).alias("total_views"),
         coalesce(col("total_add_to_cart"), lit(0)).alias("total_add_to_cart"),
         coalesce(col("total_add_to_wishlist"), lit(0)).alias("total_add_to_wishlist"),
-
-        # Nested freq_views with defaults
         default_freq_views.alias("freq_views")
     )
 
@@ -150,13 +136,13 @@ def transform_data(user_profile: DataFrame, browsing_behavior: DataFrame,
         col(c) for c in purchase_behavior.columns if c not in ["user_id", "seasonal_data"]
     ]
     purchase_behavior_struct = struct(
-        *purchase_behavior_columns,  # Other purchase behavior columns
+        *purchase_behavior_columns,
         struct(
             col("seasonal_data.winter").alias("winter"),
             col("seasonal_data.spring").alias("spring"),
             col("seasonal_data.summer").alias("summer"),
             col("seasonal_data.fall").alias("fall")
-        ).alias("seasonal_data")  # Ensure proper nesting
+        ).alias("seasonal_data")
     )
 
     product_preferences_columns = product_preferences.columns
