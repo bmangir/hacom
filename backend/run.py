@@ -6,11 +6,8 @@ import sys
 import time
 from flask_cors import CORS
 
-
-
-# Add the app directory to the Python path
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'app'))
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+from backend.app.services.service_locator import tracking_service
+from databases.postgres.neon_postgres_connector import NeonPostgresConnector
 
 from app.controllers.user_controller import user_blueprint
 from app.controllers.main_controller import main_controller_blueprint
@@ -19,6 +16,16 @@ from app.controllers.merchant_controller import merchant_controller_blueprint
 from app.controllers.cart_wishlist_controller import cart_wishlist_controller_blueprint
 from config import JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES
 from app.controllers.order_controller import order_bp
+
+try:
+    NeonPostgresConnector.initialize_connection_pool()
+except Exception as e:
+    print(f"Error initializing PostgreSQL connection pool: {e}")
+
+
+# Add the app directory to the Python path
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'app'))
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 def create_app():
     app = Flask(__name__,
@@ -47,13 +54,13 @@ def track_request():
         last_page_time = session.get('last_page_time')
 
         # Use the global tracking_service
-        #tracking_service.track_browsing_history(
-        #    user_id=session['user_id'],
-        #    session_id=session.get('session_id'),
-        #    page_url=request.path,
-        #    referrer_url=request.referrer,
-        #    last_page_time=last_page_time
-        #)
+        tracking_service.track_browsing_history(
+            user_id=session['user_id'],
+            session_id=session.get('session_id'),
+            page_url=request.path,
+            referrer_url=request.referrer,
+            last_page_time=last_page_time
+        )
 
         session['last_page_time'] = current_time
 
@@ -86,10 +93,10 @@ if __name__ == '__main__':
     # Error handlers
     @app.errorhandler(404)
     def page_not_found(e):
-        return render_template('404.html'), 404
+        return "404 Error"
 
     @app.errorhandler(500)
     def internal_server_error(e):
-        return render_template('500.html'), 500
+        return "500 Error"
 
     app.run(host="127.0.0.1", port=8080, debug=True)
