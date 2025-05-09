@@ -1,3 +1,4 @@
+import json
 import os
 import traceback
 from _decimal import Decimal
@@ -56,13 +57,19 @@ def create_spark_session(app_name, spark=None, num_of_partition="100"):
     return spark
 
 
-def read_from_mongodb(spark, db_name, coll_name, filter='{}'):
+def read_from_mongodb(spark, db_name, coll_name, filter={}):
+    if isinstance(filter, str):
+        filter = json.loads(filter)
+
+    # Create pipeline with filter
+    pipeline = [{"$match": filter}]
+
     df = spark.read \
         .format("mongodb") \
         .option("spark.mongodb.read.connection.uri", MONGO_URI) \
         .option("database", db_name) \
         .option("collection", coll_name) \
-        .option("pipeline", filter) \
+        .option("pipeline", json.dumps(pipeline)) \
         .load()
 
     return df
