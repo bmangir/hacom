@@ -17,7 +17,6 @@ register_connection(
     maxPoolSize=100
 )
 
-
 class UBCF(Document):
     meta = {
         'db_alias': 'recc_default',
@@ -100,3 +99,16 @@ class ProductDetails(Document):
     format = StringField()
     author = StringField()
     language = StringField()
+
+
+class CategoryRecommendation(Document):
+    meta = {
+        'db_alias': 'recc_default',
+        'collection': 'category_recommendations'
+    }
+
+    user_id = StringField(required=True)
+    category = StringField()
+    source = StringField()
+    recc_at = LongField()
+    total_count = IntField()

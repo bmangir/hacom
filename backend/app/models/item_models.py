@@ -1,7 +1,7 @@
 from mongoengine import Document, StringField, IntField, LongField, FloatField, connect, get_connection, \
-    register_connection, DictField, DateTimeField
+    register_connection, DictField, DateTimeField, ListField
 
-from backend.config import MONGO_RECOMMENDATION_DB, MONGO_URI
+from backend.config import MONGO_RECOMMENDATION_DB, MONGO_URI, MONGO_AGG_DATA_DB
 
 register_connection(
     alias='recc_default',
@@ -9,6 +9,24 @@ register_connection(
     host=MONGO_URI,
     maxPoolSize=100
 )
+
+register_connection(
+    alias='agg_default',
+    name=MONGO_AGG_DATA_DB,
+    host=MONGO_URI,
+    maxPoolSize=100
+)
+
+
+class BoughtTogether(Document):
+    meta = {
+        'db_alias': 'agg_default',
+        'collection': 'item_features',
+        'strict': False
+    }
+
+    product_id = StringField(required=True)
+    bought_together = ListField(StringField())
 
 
 class IBCF(Document):
@@ -32,14 +50,22 @@ class IBCF(Document):
 class BestSellers(Document):
     meta = {
         'db_alias': 'recc_default',
-        'collection': 'best_sellers'
+        'collection': 'best_sellers',
+        "strict": False
     }
+
+    product_id = StringField(required=True)
+    avg_rating = FloatField()
+    recc_at = LongField()
+    trending_score = FloatField()
+    date_added = DateTimeField()
 
 
 class NewArrivals(Document):
     meta = {
         'db_alias': 'recc_default',
-        'collection': 'new_arrivals'
+        'collection': 'new_arrivals',
+        "strict": False
     }
 
     # avg_rating', 'recc_at', 'date_added', 'product_id', 'trending_score
@@ -53,7 +79,8 @@ class NewArrivals(Document):
 class SeasonalRecc(Document):
     meta = {
         'db_alias': 'recc_default',
-        'collection': 'seasonal'
+        'collection': 'seasonal',
+        "strict": False
     }
 
     product_id = StringField(required=True)
@@ -66,14 +93,22 @@ class SeasonalRecc(Document):
 class ReviewedBased(Document):
     meta = {
         'db_alias': 'recc_default',
-        'collection': 'reviewed_based'
+        'collection': 'review_based',
+        "strict": False
     }
+
+    product_id = StringField(required=True)
+    avg_rating = FloatField()
+    review_count = IntField()
+    trending_score = FloatField()
+    recc_at = LongField()
 
 
 class Trending(Document):
     meta = {
         'db_alias': 'recc_default',
-        'collection': 'trending_products'
+        'collection': 'trending_products',
+        "strict": False
     }
     # latest_sales_summary', 'avg_rating', 'trending_score', 'product_id
     product_id = StringField(required=True)
@@ -81,3 +116,13 @@ class Trending(Document):
     trending_score = FloatField()
     latest_sales_summary = DictField()
 
+
+class TrendingCategories(Document):
+    meta = {
+        'db_alias': 'agg_default',
+        'collection': 'top_n_products_by_category',
+        'strict': False
+    }
+
+    category = StringField(required=True)
+    top_20_product_ids = ListField(StringField())
