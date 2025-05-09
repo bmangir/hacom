@@ -626,7 +626,7 @@ def review_based_recommendations_all():
             "product_id",
             "avg_rating",
             "review_count",
-            coalesce(col("trending_score"), lit(0))
+            "trending_score"
         )\
         .orderBy(desc("avg_rating"))
 
@@ -798,7 +798,7 @@ def personalized_trending_products():
         "engagement_score",
         "personalization_score",
         "conversion_rate",
-        "recc_att"
+        "recc_at"
     )
 
     store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "personalized_trending", final_recommendations)
