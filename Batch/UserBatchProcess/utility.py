@@ -1,11 +1,7 @@
 from pyspark.sql.functions import *
-from pyspark.sql.types import FloatType
-from sentence_transformers import SentenceTransformer
-from sklearn.preprocessing import MinMaxScaler
 import numpy as np
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
-scaler = MinMaxScaler()
+from config import sentence_transformer_model
 
 
 def vectorize(ctr, user_profile, browsing_behavior, purchase_behavior, product_preferences,
@@ -62,26 +58,32 @@ def vectorize(ctr, user_profile, browsing_behavior, purchase_behavior, product_p
     num_features = [float(x) for x in num_features]
 
     # Convert List-Based Features into Embeddings
-    categories_vector = model.encode(
+    categories_vector = sentence_transformer_model.encode(
         " ".join(browsing_behavior["freq_views"]["categories"])) if "freq_views" in browsing_behavior else np.zeros(384)
-    products_vector = model.encode(
+    products_vector = sentence_transformer_model.encode(
         " ".join(browsing_behavior["freq_views"]["products"])) if "freq_views" in browsing_behavior else np.zeros(384)
-    brands_vector = model.encode(" ".join(product_preferences["most_purchased_brands"])) if product_preferences[
+    brands_vector = sentence_transformer_model.encode(" ".join(product_preferences["most_purchased_brands"])) if product_preferences[
         "most_purchased_brands"] else np.zeros(384)
 
     # Convert Categorical Features into Embeddings
     user_profile_str = f"{user_profile['gender']} {user_profile['device_type']} {user_profile['payment_method']}"
-    user_profile_vector = model.encode(user_profile_str)
+    user_profile_vector = sentence_transformer_model.encode(user_profile_str)
 
     # Extract Seasonal Data
     seasonal_data = purchase_behavior["seasonal_data"]
     seasonal_vector = np.array([seasonal_data[season] for season in ["winter", "spring", "summer", "fall"]])
 
     # Extract Recent Views and Purchases
-    recent_views_vector = model.encode(
-        " ".join(browsing_behavior["freq_views"]["recently_viewed_products"])) if "freq_views" in browsing_behavior else np.zeros(384)
-    recent_purchases_vector = model.encode(
-        " ".join(purchase_behavior["recently_purchased_products"])) if "recently_purchased_products" in purchase_behavior else np.zeros(384)
+    try:
+        recent_views_vector = sentence_transformer_model.encode(
+            " ".join(browsing_behavior["freq_views"]["recently_viewed_products"])) if "freq_views" in browsing_behavior else np.zeros(384)
+    except:
+        recent_views_vector = np.zeros(384)
+    try:
+        recent_purchases_vector = sentence_transformer_model.encode(
+            " ".join(purchase_behavior["recently_purchased_products"])) if "recently_purchased_products" in purchase_behavior else np.zeros(384)
+    except:
+        recent_purchases_vector = np.zeros(384)
 
     # Apply Weights and Concatenate
     weighted_vector = np.concatenate([

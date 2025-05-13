@@ -3,7 +3,7 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor
 from pinecone import Pinecone
 from pyspark.sql.dataframe import DataFrame
-from config import PINECONE_API_KEY
+from config import NEW_PINECONE_API as PINECONE_API_KEY
 import threading
 
 MAX_BYTES = 4 * 1024 * 1024  # 4MB

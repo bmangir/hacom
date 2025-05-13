@@ -1,33 +1,44 @@
-import json
 import os
-from _decimal import Decimal
 from datetime import datetime
+
 from pyspark.sql import SparkSession, Window
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
-from config import MONGO_URI, MONGO_AGG_DATA_DB, USER_FEATURES_HOST, ITEM_FEATURES_HOST, \
-    MONGO_PRODUCTS_DB, KAFKA_BOOTSTRAP_SERVERS, KAFKA_INTERACTION_TOPIC
+
+from Stream.recommendation_founder import run_all_recommendations
+from config import MONGO_URI, MONGO_AGG_DATA_DB, NEW_USER_FEATURES_HOST as USER_FEATURES_HOST, NEW_ITEM_FEATURES_HOST as ITEM_FEATURES_HOST, \
+    MONGO_PRODUCTS_DB, CONFLUENT_BOOTSTRAP_SERVERS, CONFLUENT_INTERACTION_TOPIC, CONFLUENT_API_KEY, CONFLUENT_API_SECRET
 from utilities.spark_utility import read_from_mongodb, read_postgres_table, update_doc_in_mongodb
 from utilities.pinecone_utility import store_to_pinecone
 from Batch.UserBatchProcess.utility import vectorize
 from Batch.ItemBatchProcess.utility import vectorize_item_features
 
-os.environ["PYSPARK_SUBMIT_ARGS"] = (
-    "--packages org.postgresql:postgresql:42.6.0,org.mongodb.spark:mongo-spark-connector_2.12:10.3.0 pyspark-shell --driver-memory 4g pyspark-shell,"
-    "--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.kafka:kafka-clients:2.8.0,"
-    "org.apache.kafka:kafka-clients:2.8.0 pyspark-shell"
-)
+
+import logging
+logging.getLogger("org.apache.spark").setLevel(logging.DEBUG)
+
+packages = [
+    "org.apache.spark:spark-streaming-kafka-0-10_2.12:3.5.0",
+    "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0",
+    "org.postgresql:postgresql:42.6.0",
+    "org.mongodb.spark:mongo-spark-connector_2.12:10.3.0"
+]
 
 
-# Kafka configuration
-bootstrap_servers = KAFKA_BOOTSTRAP_SERVERS
-topic_name = KAFKA_INTERACTION_TOPIC
+# Set Spark submit arguments
+os.environ['PYSPARK_SUBMIT_ARGS'] = f'--packages {",".join(packages)} pyspark-shell'
 
+# Initialize Spark Session
 spark = SparkSession.builder \
-    .appName("RealTimeRecommendationEngine") \
+    .appName("Confluent Kafka Connection") \
     .config("spark.mongodb.input.uri", MONGO_URI) \
     .config("spark.mongodb.output.uri", MONGO_URI) \
     .getOrCreate()
+
+# Create checkpoint directory
+checkpoint_dir = "/tmp/spark_streaming_checkpoint"
+if not os.path.exists(checkpoint_dir):
+    os.makedirs(checkpoint_dir)
 
 # Define schema for incoming events
 event_schema = StructType([
@@ -420,7 +431,9 @@ def process_windowed_events(df, epoch_id):
     print(f"Processing batch for epoch {epoch_id} with {df.count()} events")
 
     # Group events by user_id and product_id within the window
-    windowed_events = df.groupBy(
+    windowed_events = df \
+        .withWatermark("timestamp", "3 minutes") \
+        .groupBy(
         "user_id",
         "product_id",
         "event_type"
@@ -434,9 +447,9 @@ def process_windowed_events(df, epoch_id):
         user_id = row["user_id"]
         product_id = row["product_id"]
         event_type = row["event_type"]
-        details = row["details_list"][0]  # Take the first details as they should be similar for the same event type
+        details = row["details_list"][0] if row["details_list"] and len(row["details_list"]) > 0 else {}
 
-        print(f"Processing event for user: {user_id}, product: {product_id}, event_type: {event_type}")
+        print(f"Processing event for user: {user_id}, product: {product_id}, event_type: {event_type}, details: {details}")
 
         try:
             # Update user features first
@@ -446,8 +459,11 @@ def process_windowed_events(df, epoch_id):
             # Update item features if there's a product_id
             if product_id:
                 update_item_features(product_id, event_type, details)
+
         except Exception as e:
             print(f"Error processing event: {str(e)}")
+
+    run_all_recommendations()
 
 
 def get_current_season():
@@ -462,84 +478,72 @@ def get_current_season():
     else:
         return "Fall"
 
-# Read from Kafka
-df = spark \
-    .readStream \
+
+df = spark.readStream \
     .format("kafka") \
-    .option("kafka.bootstrap.servers", bootstrap_servers) \
-    .option("subscribe", topic_name) \
-    .option("startingOffsets", "latest") \
+    .option("kafka.bootstrap.servers", CONFLUENT_BOOTSTRAP_SERVERS) \
+    .option("subscribe", CONFLUENT_INTERACTION_TOPIC) \
+    .option("kafka.security.protocol", "SASL_SSL") \
+    .option("kafka.sasl.mechanism", "PLAIN") \
+    .option("kafka.sasl.jaas.config", f'org.apache.kafka.common.security.plain.PlainLoginModule required username="{CONFLUENT_API_KEY}" password="{CONFLUENT_API_SECRET}";') \
+    .option("group.id", "python-group-1") \
+    .option("startingOffsets", "earliest") \
+    .option("failOnDataLoss", "false") \
+    .option("maxOffsetsPerTrigger", 1000) \
     .load()
 
-# Parse JSON events
+df = df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
+
+df_json = df.selectExpr("key", "CAST(value AS STRING) as json_value")
+
 parsed_df = df.select(
     from_json(col("value").cast("string"), event_schema).alias("data")
 ).select("data.*")
+parsed_df.printSchema()
 
-# Apply 3-minute tumbling window
-windowed_df = parsed_df \
-    .withWatermark("timestamp", "3 minutes") \
-    .groupBy(
-    window(col("timestamp"), "3 minutes"),
-    col("user_id"),
-    col("product_id"),
-    col("event_type"),
-    col("details")
-)
+# Process the parsed DataFrame in 3-minute windows
+parsed_df = parsed_df.withColumn("timestamp", current_timestamp())
+#windowed_df = parsed_df \
+#    .withWatermark("timestamp", "3 minutes") \
+#    .groupBy(
+#        window(col("timestamp"), "3 minutes"),
+#        col("user_id"),
+#        col("product_id"),
+#        col("event_type")
+#    ).agg(
+#        count("*").alias("event_count"),
+#        collect_list(col("details")).alias("details_list")
+#    )
 
-# Process windowed events
-query = windowed_df.writeStream \
-    .foreachBatch(process_windowed_events) \
+# Apply the data to the processing function
+query = parsed_df.writeStream \
     .outputMode("update") \
-    .trigger(processingTime="3 minutes") \
+    .foreachBatch(process_windowed_events) \
+    .option("truncate", "false") \
+    .option("checkpointLocation", checkpoint_dir) \
+    .trigger(processingTime="30 seconds") \
     .start()
 
-# Wait for termination
-query.awaitTermination()
+#query = parsed_df.writeStream \
+#    .outputMode("append") \
+#    .format("console") \
+#    .option("truncate", "false") \
+#    .option("kafka.bootstrap.servers", CONFLUENT_BOOTSTRAP_SERVERS) \
+#    .option("subscribe", CONFLUENT_INTERACTION_TOPIC) \
+#    .start()
 
-# For testing purposes - comment out in production
-"""
-test_data = [
-    {
-        "user_id": "U10",
-        "product_id": "P1068738173",
-        "event_type": "view",
-        "details": {
-            "session_id": "S27740",
-            "user_id": "U10",
-            "product_id": "P1068738173",
-            "page_url": "/products/details/P1068738173",
-            "view_date": "2025-05-01",
-            "view_duration": 204,
-            "referrer_url": "/search"
-        },
-        "timestamp": "2023-10-01T12:34:56Z"
+# Add error handling
+try:
+    query.awaitTermination()
+except Exception as e:
+    print(f"Streaming query failed: {str(e)}")
+    # Log the error to MongoDB or another logging system
+    import traceback
+    error_details = {
+        "error_type": type(e).__name__,
+        "error_message": str(e),
+        "stack_trace": traceback.format_exc(),
+        "timestamp": datetime.now()
     }
-]
-
-schema = StructType([
-    StructField("user_id", StringType(), True),
-    StructField("product_id", StringType(), True),
-    StructField("event_type", StringType(), True),
-    StructField("details", MapType(StringType(), StringType()), True),
-    StructField("timestamp", StringType(), True)
-])
-
-test_df = spark.createDataFrame(test_data, schema=schema)
-
-process_windowed_events(test_df, None)
-"""
-
-# Data format which will come from Kafka:
-# {
-#   "user_id": "user_123",
-#   "product_id": "product_456",
-#   "event_type": "view",
-#   "details": {
-#     "session_id": "session_789",
-#     "page_url": "/products/details/product_456",
-#     "view_duration": 120,
-#     "referrer_url": "/search"
-#   },
-#   "timestamp": "2023-10-01T12:34:56Z"
-# }
+    #client[MONGO_LOGS_DB]["streaming_errors"].insert_one(error_details)
+    raise  # Re-raise the exception after logging

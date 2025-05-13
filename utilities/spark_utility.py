@@ -12,10 +12,15 @@ from pyspark.sql.dataframe import DataFrame
 import inspect
 
 from config import MONGO_URI, client, MONGO_LOGS_DB, MONGO_PRODUCTS_DB, MONGO_BROWSING_DB, JDBC_URL, NEON_DB_USER, \
-    NEON_DB_PASSWORD
+    NEON_DB_PASSWORD, CONFLUENT_BOOTSTRAP_SERVERS
 
-os.environ[
-    'PYSPARK_SUBMIT_ARGS'] = '--packages org.postgresql:postgresql:42.6.0,org.mongodb.spark:mongo-spark-connector_2.12:10.3.0 pyspark-shell --driver-memory 4g pyspark-shell'
+os.environ['PYSPARK_SUBMIT_ARGS'] = (
+    "--packages org.apache.spark:spark-streaming-kafka-0-10_2.12:3.2.0,"
+    "org.apache.spark:spark-sql-kafka-0-10_2.12:3.2.0,"
+    "org.postgresql:postgresql:42.6.0,"
+    "org.mongodb.spark:mongo-spark-connector_2.12:10.3.0 "
+    "pyspark-shell"
+)
 db = client[MONGO_LOGS_DB]
 collection = db["logs"]
 
@@ -50,7 +55,7 @@ def create_spark_session(app_name, spark=None, num_of_partition="100"):
             .config("spark.dynamicAllocation.initialExecutors", "10") \
             .config("spark.task.maxFailures", "10") \
             .config("spark.speculation", "true") \
-            .config("spark.kafka.bootstrap.servers", "localhost:9092") \
+            .config("spark.kafka.bootstrap.servers", CONFLUENT_BOOTSTRAP_SERVERS) \
             .config("spark.kafka.consumer.cache.capacity", "256") \
             .getOrCreate()
 

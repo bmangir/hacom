@@ -1,7 +1,7 @@
 from pinecone import Pinecone
 from pyspark.sql import SparkSession, DataFrame
 
-from config import MONGO_AGG_DATA_DB, USER_FEATURES_HOST, PINECONE_API_KEY
+from config import MONGO_AGG_DATA_DB, NEW_USER_FEATURES_HOST as USER_FEATURES_HOST
 from utilities.spark_utility import extract_data, read_from_hdfs, store_df_to_mongodb, store_to_hdfs
 from utilities.pinecone_utility import store_to_pinecone
 

@@ -6,9 +6,9 @@ from pyspark.sql import Window
 from pyspark.sql.functions import *
 from pyspark.sql.types import FloatType, MapType, Row
 
-from config import MONGO_PRODUCTS_DB, client, ITEM_FEATURES_HOST, ITEM_CONTENTS_HOST
+from config import MONGO_PRODUCTS_DB, client, NEW_ITEM_FEATURES_HOST as ITEM_FEATURES_HOST, NEW_ITEM_CONTENTS_HOST as ITEM_CONTENTS_HOST
 from Batch.models import item_model as ItemModel
-import utility
+from Batch.ItemBatchProcess import utility
 from utilities.spark_utility import create_spark_session
 
 
@@ -98,7 +98,6 @@ class ItemBatchService:
                 color, material, gender, size, tags, details,
                 format, language
         ):
-            print(f"Details Değeri: {details}, Tipi: {type(details)}")
             metadata = {}
 
             for key, val in {
@@ -166,9 +165,6 @@ class ItemBatchService:
             )
         )
 
-        a = basic_item_information.limit(1).toJSON().collect()
-        b = [json.loads(row) for row in a]
-        print(b[0])
         return basic_item_information.select("product_id", "product_name", "category", "brand", "price",
                                              "stock_quantity", "price_bucket", "stock_status", "metadata")
 
@@ -721,14 +717,29 @@ class ItemBatchService:
         return vectorized_df.select("id", "values")
 
     def start(self):
+        print("\n" + "="*50)
+        print("🔄 Starting Item Batch Process")
+        print("="*50)
+        
+        print("\n📊 Defining item features and profiles...")
         distributed_content_df, top_products_based_cat_df, distributed_features_df = self.define_item_profile()
 
+        print("💾 Storing top products by category...")
         ItemModel.store_agg_data_to_mongodb(top_products_based_cat_df, "top_n_products_by_category")
+        
+        print("💾 Storing item contents...")
         ItemModel.store_agg_data_to_mongodb(distributed_content_df.drop("product_num", "product_range", "metadata"), "item_contents")
+        
+        print("💾 Storing item features...")
         ItemModel.store_agg_data_to_mongodb(distributed_features_df.drop("product_num", "product_range", "metadata"), "item_features")
 
+        print("🔄 Starting vectorization process...")
         self.start_vectorization(distributed_features_df, distributed_content_df)
+
+        print("✨ Item Batch Process completed!")
+        print("="*50)
         self.stop()
 
     def stop(self):
-        print("IT'S DONE")
+        print("🛑 Stopping Item Batch Service")
+        print("="*50 + "\n")

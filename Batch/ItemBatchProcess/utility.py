@@ -1,21 +1,9 @@
-import nltk
 import numpy
 import torch
-from nltk.sentiment import SentimentIntensityAnalyzer
 from pyspark.sql.functions import *
 from pyspark.sql.dataframe import DataFrame
-from sentence_transformers import SentenceTransformer
-from sklearn.preprocessing import MinMaxScaler
-from transformers import BertTokenizer, BertModel
 
-nltk.download("vader_lexicon")
-
-sia = SentimentIntensityAnalyzer()
-sentence_transformer_model = SentenceTransformer("all-MiniLM-L6-v2")
-scaler = MinMaxScaler()
-
-tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-bert_model = BertModel.from_pretrained('bert-base-uncased')
+from config import sentence_transformer_model, sia, tokenizer, bert_model
 
 
 def analyze_sentiment(text):

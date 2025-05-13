@@ -5,13 +5,11 @@ from pyspark.sql import Window
 from pyspark.sql.functions import *
 from pyspark.sql.types import FloatType
 
+from Batch.UserBatchProcess import utility
 from Batch.models import user_model as UserModel
-import utility
 from utilities.spark_utility import create_spark_session
 
 user_feature_ext_sj = create_spark_session(app_name="user-features-extraction-job")
-user_feature_vectorization_sj = create_spark_session(app_name="user-features-vectorization-job")
-reader_sj = create_spark_session(app_name="user-reader-job")
 
 
 class UserBatchService:
@@ -641,10 +639,23 @@ class UserBatchService:
         UserModel.store_vectors(vectorized_agg_df)
 
     def start(self):
+        print("\n" + "="*50)
+        print("🔄 Starting User Batch Process")
+        print("="*50)
+        
+        print("\n📊 Defining user features...")
         distributed_df = self.define_user_features().cache()
+        
+        print("💾 Storing aggregated data to MongoDB...")
         UserModel.store_agg_data_to_mongodb(distributed_df.drop("user_num", "user_range"))
+        
+        print("🔄 Starting vectorization process...")
         self.start_vectorization(distributed_df)
+        
+        print("✨ User Batch Process completed!")
+        print("="*50)
         self.stop()
 
     def stop(self):
-        print("IT'S DONE")
+        print("🛑 Stopping User Batch Service")
+        print("="*50 + "\n")

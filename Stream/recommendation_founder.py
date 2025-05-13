@@ -1,15 +1,34 @@
+import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-from pyspark.sql import Window
+from pyspark.sql import Window, SparkSession
 from pyspark.sql.functions import *
 
 from Stream.utility import find_similar_objects_udf
-from config import MONGO_AGG_DATA_DB, USER_FEATURES_HOST, ITEM_FEATURES_HOST, ITEM_CONTENTS_HOST, \
-    MONGO_PRODUCTS_DB, client, MONGO_RECOMMENDATION_DB
-from utilities.spark_utility import read_from_mongodb, create_spark_session, store_df_to_mongodb
+from config import MONGO_AGG_DATA_DB, NEW_USER_FEATURES_HOST as USER_FEATURES_HOST, \
+    NEW_ITEM_FEATURES_HOST as ITEM_FEATURES_HOST, NEW_ITEM_CONTENTS_HOST as ITEM_CONTENTS_HOST, \
+    MONGO_PRODUCTS_DB, client, MONGO_RECOMMENDATION_DB, MONGO_URI
+from utilities.spark_utility import read_from_mongodb, store_df_to_mongodb
+
+packages = [
+    "org.apache.spark:spark-streaming-kafka-0-10_2.12:3.5.0",
+    "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0",
+    "org.postgresql:postgresql:42.6.0",
+    "org.mongodb.spark:mongo-spark-connector_2.12:10.3.0"
+]
 
 
-spark = create_spark_session("reader")
+# Set Spark submit arguments
+os.environ['PYSPARK_SUBMIT_ARGS'] = f'--packages {",".join(packages)} pyspark-shell'
+
+spark = SparkSession.builder \
+    .config("spark.mongodb.input.uri", MONGO_URI) \
+    .config("spark.mongodb.output.uri", MONGO_URI) \
+    .config("spark.sql.shuffle.partitions", "200") \
+    .config("spark.default.parallelism", "200") \
+    .getOrCreate()
+
 
 products_df = read_from_mongodb(
     spark=spark, 
@@ -817,6 +836,8 @@ def run_all_recommendations():
     personalized_trending_products()
     user_based_category_recommendations_all()
 
-
-if __name__ == "__main__":
-    run_all_recommendations()
+print("Starting recommendation generation...")
+start = datetime.now()
+run_all_recommendations()
+end = datetime.now()
+print(f"Recommendations generated in {end - start} seconds.")

@@ -1,15 +1,13 @@
 import json
 import time
 
-import requests
 from flask import Flask, request
 from pyspark.sql.functions import *
 from pyspark.sql.types import FloatType, IntegerType, DoubleType
 
 from Batch.UserBatchProcess.utility import vectorize
-from Stream.recommendation_founder import run_all_recommendations
 from Stream.utility import find_similar_objects_udf
-from config import USER_FEATURES_HOST, MONGO_AGG_DATA_DB, MONGO_RECOMMENDATION_DB
+from config import NEW_USER_FEATURES_HOST as USER_FEATURES_HOST, MONGO_AGG_DATA_DB, MONGO_RECOMMENDATION_DB
 from utilities.spark_utility import create_spark_session, store_df_to_mongodb, read_from_mongodb
 from utilities.pinecone_utility import store_to_pinecone
 
