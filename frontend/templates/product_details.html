@@ -441,6 +441,13 @@ margin-top: 5px;
                 {% endfor %}
                 {% endif %}
 
+                {% if product.language %}
+                <div class="detail-item">
+                    <span class="detail-label">Language:</span>
+                    <span class="detail-value">{{ product.language }}</span>
+                </div>
+                {% endif %}
+
                 {% if product.color and product.color is iterable and product.color is not string and product.color is not number %}
                 <div class="detail-item">
                     <span class="detail-label">Color:</span>
@@ -560,6 +567,41 @@ margin-top: 5px;
     {% endif %}
 </div>
 
+<!-- Frequently Bought Together Section -->
+<div class="similar-products bought-together">
+    <h2>Frequently Bought Together</h2>
+    {% if bought_together %}
+        {% if bought_together|length > 4 %}
+            <button class="slider-arrow left" onclick="slideProducts('left', 'boughtTogetherSlider')" id="boughtTogetherLeftArrow" style="display: none;">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="slider-arrow right" onclick="slideProducts('right', 'boughtTogetherSlider')" id="boughtTogetherRightArrow">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        {% endif %}
+        <div class="products-slider" id="boughtTogetherSlider">
+            {% for bought_product in bought_together %}
+                <div class="product-slide">
+                    <div class="product-image">
+                        <img src="{{ bought_product.image_url }}" alt="{{ bought_product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                    </div>
+                    <div class="product-info">
+                        <h3>{{ bought_product.name }}</h3>
+                        <p class="product-price">${{ "%.2f"|format(bought_product.price) }}</p>
+                        <div class="button-container">
+                            <button class="view-details" onclick="window.location.href='/product/{{ bought_product.id }}'">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No frequently bought together products found</p>
+    {% endif %}
+</div>
+
 <!-- Category Products Section -->
 <div class="similar-products category-products">
     <h2>More from {{ product.category }}</h2>
@@ -665,6 +707,111 @@ margin-top: 5px;
     {% endif %}
 </div>
 
+<!-- New Arrivals Section -->
+<div class="similar-products new-arrivals">
+    <h2>New Arrivals</h2>
+    {% if new_arrivals %}
+        {% if new_arrivals|length > 4 %}
+            <button class="slider-arrow left" onclick="slideProducts('left', 'newArrivalsSlider')" id="newArrivalsLeftArrow" style="display: none;">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="slider-arrow right" onclick="slideProducts('right', 'newArrivalsSlider')" id="newArrivalsRightArrow">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        {% endif %}
+        <div class="products-slider" id="newArrivalsSlider">
+            {% for product in new_arrivals %}
+                <div class="product-slide">
+                    <div class="product-image">
+                        <img src="{{ product.image_url }}" alt="{{ product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                    </div>
+                    <div class="product-info">
+                        <h3>{{ product.name }}</h3>
+                        <p class="product-price">${{ "%.2f"|format(product.price) }}</p>
+                        <div class="button-container">
+                            <button class="view-details" onclick="window.location.href='/product/{{ product.id }}'">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No new arrivals available</p>
+    {% endif %}
+</div>
+
+<!-- Best Sellers Section -->
+<div class="similar-products best-sellers">
+    <h2>Best Sellers</h2>
+    {% if best_sellers %}
+        {% if best_sellers|length > 4 %}
+            <button class="slider-arrow left" onclick="slideProducts('left', 'bestSellersSlider')" id="bestSellersLeftArrow" style="display: none;">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="slider-arrow right" onclick="slideProducts('right', 'bestSellersSlider')" id="bestSellersRightArrow">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        {% endif %}
+        <div class="products-slider" id="bestSellersSlider">
+            {% for product in best_sellers %}
+                <div class="product-slide">
+                    <div class="product-image">
+                        <img src="{{ product.image_url }}" alt="{{ product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                    </div>
+                    <div class="product-info">
+                        <h3>{{ product.name }}</h3>
+                        <p class="product-price">${{ "%.2f"|format(product.price) }}</p>
+                        <div class="button-container">
+                            <button class="view-details" onclick="window.location.href='/product/{{ product.id }}'">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No best sellers available</p>
+    {% endif %}
+</div>
+
+<!-- Seasonal Recommendations Section -->
+<div class="similar-products seasonal">
+    <h2>Seasonal Picks</h2>
+    {% if seasonal_items %}
+        {% if seasonal_items|length > 4 %}
+            <button class="slider-arrow left" onclick="slideProducts('left', 'seasonalSlider')" id="seasonalLeftArrow" style="display: none;">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="slider-arrow right" onclick="slideProducts('right', 'seasonalSlider')" id="seasonalRightArrow">
+                <i class="fas fa-chevron-right"></i>
+            </button>
+        {% endif %}
+        <div class="products-slider" id="seasonalSlider">
+            {% for product in seasonal_items %}
+                <div class="product-slide">
+                    <div class="product-image">
+                        <img src="{{ product.image_url }}" alt="{{ product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                    </div>
+                    <div class="product-info">
+                        <h3>{{ product.name }}</h3>
+                        <p class="product-price">${{ "%.2f"|format(product.price) }}</p>
+                        <div class="button-container">
+                            <button class="view-details" onclick="window.location.href='/product/{{ product.id }}'">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No seasonal recommendations available</p>
+    {% endif %}
+</div>
+
 <script>
 function toggleWishlist(productId) {
     const button = document.getElementById('wishlist-button');
@@ -723,6 +870,10 @@ document.addEventListener('DOMContentLoaded', function() {
     updateArrows('categorySlider');
     updateArrows('userLikedSlider');
     updateArrows('contentRecSlider');
+    updateArrows('boughtTogetherSlider');
+    updateArrows('newArrivalsSlider');
+    updateArrows('bestSellersSlider');
+    updateArrows('seasonalSlider');
 });
 
 function addToCart(productId, quantity) {

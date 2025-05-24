@@ -220,6 +220,48 @@
 .view-all-link i {
     font-size: 0.8em;
 }
+.popular-categories {
+padding: 2rem;
+background-color: #f2f4f8;
+}
+
+.popular-categories h2 {
+text-align: center;
+font-size: 2rem;
+margin-bottom: 2rem;
+color: #222;
+}
+
+.category-list {
+display: flex;
+flex-wrap: wrap;
+justify-content: center;
+gap: 1.2rem;
+}
+
+.category-item {
+background-color: #ffffff;
+border-radius: 12px;
+box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+text-align: center;
+padding: 1rem 1.5rem;
+transition: all 0.25s ease;
+min-width: 140px;
+}
+
+.category-item a {
+text-decoration: none;
+color: #0077cc;
+font-weight: 600;
+font-size: 1.1rem;
+display: block;
+}
+
+.category-item:hover {
+transform: translateY(-5px);
+box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+background-color: #eaf4ff;
+}
 {% endblock %}
 
 {% block content %}
@@ -244,13 +286,12 @@
     </div>
 </div>
 
-<div class="category-section">
-    <h2>Most Visited Categories</h2>
-    <div class="product-grid">
+<div class="popular-categories">
+    <h2>Popular Categories</h2>
+    <div class="category-list">
         {% for category in most_visited_categories %}
-        <div class="category-card">
-            <h3>{{ category.name }}</h3>
-            <p>{{ category.visit_count }} visits</p>
+        <div class="category-item">
+            <a href="/category/{{ category|urlencode }}">{{ category|title }}</a>
         </div>
         {% endfor %}
     </div>

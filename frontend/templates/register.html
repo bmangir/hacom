@@ -141,6 +141,16 @@
     .form-footer a:hover {
       text-decoration: underline;
     }
+
+    .error-message {
+      display: none;
+      color: #ff3333;
+      background-color: rgba(255, 0, 0, 0.1);
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 15px;
+      text-align: left;
+    }
   </style>
 </head>
 <body>
@@ -157,6 +167,9 @@
 <div class="register-container">
   <h1>Register</h1>
   <form id="registerForm">
+    <!-- Error message container --> 
+    <div id="errorMessage" class="error-message"></div>
+
     <label for="first_name">First Name:</label>
     <input type="text" id="first_name" name="first_name" placeholder="Enter your first name" required>
 
@@ -196,10 +209,26 @@
   // Wait for the DOM to load before adding event listener
   document.addEventListener('DOMContentLoaded', function () {
       const form = document.getElementById('registerForm');
+      const errorMessage = document.getElementById('errorMessage');
+
+      // Function to display error messages
+      function showError(message) {
+          errorMessage.textContent = message;
+          errorMessage.style.display = 'block';
+          // Scroll to the error message
+          errorMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+
+      // Function to clear error messages
+      function clearError() {
+          errorMessage.textContent = '';
+          errorMessage.style.display = 'none';
+      }
 
       // Add event listener for form submission
       form.addEventListener('submit', function (event) {
           event.preventDefault();  // Prevent the default form submission
+          clearError(); // Clear any previous errors
 
           const formData = new FormData(form);
           const data = {};
@@ -209,6 +238,15 @@
               data[key] = value;
           });
 
+          // Client-side validation
+          const requiredFields = ['email', 'password', 'first_name', 'last_name', 'gender', 'birthdate'];
+          const missingFields = requiredFields.filter(field => !data[field]);
+          
+          if (missingFields.length > 0) {
+              showError(`Please fill in all required fields: ${missingFields.join(', ')}`);
+              return;
+          }
+
           // Send data to backend
           fetch('/register', {
               method: 'POST',
@@ -217,17 +255,25 @@
               },
               body: JSON.stringify(data)
           })
-          .then(response => response.json())
+          .then(response => {
+              // Parse the JSON response
+              return response.json().then(data => {
+                  // Add the status to the response data for easier handling
+                  return { ...data, status: response.status };
+              });
+          })
           .then(data => {
               if (data.success) {
                   // Redirect to login page on successful registration
                   window.location.href = '/login';
               } else {
-                  alert(data.message);
+                  // Display error message from backend
+                  showError(data.message || 'Registration failed. Please try again.');
               }
           })
           .catch(error => {
               console.error('Error:', error);
+              showError('An unexpected error occurred. Please try again later.');
           });
       });
   });
