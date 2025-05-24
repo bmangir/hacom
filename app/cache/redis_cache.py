@@ -180,6 +180,21 @@ class RecommendationCache:
         except Exception as e:
             print(f"Redis delete error: {str(e)}")
 
+    def clear_all_cache(self):
+        """Clear all cache data from Redis"""
+        if not self.is_connected():
+            return
+            
+        try:
+            # Delete all keys with recommendations prefix
+            pattern = "recommendations:*"
+            keys = self.redis_client.keys(pattern)
+            if keys:
+                self.redis_client.delete(*keys)
+            print("All cache data has been cleared successfully")
+        except Exception as e:
+            print(f"Error clearing all cache: {str(e)}")
+
     def get_recently_viewed_products(self, user_id: str) -> Optional[List[Dict]]:
         """Get cached recently viewed products for a user"""
         if not self.is_connected():
