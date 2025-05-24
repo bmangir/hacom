@@ -18,17 +18,6 @@ register_connection(
 )
 
 
-class BoughtTogether(Document):
-    meta = {
-        'db_alias': 'agg_default',
-        'collection': 'item_features',
-        'strict': False
-    }
-
-    product_id = StringField(required=True)
-    bought_together = ListField(StringField())
-
-
 class IBCF(Document):
     meta = {
         'db_alias': 'recc_default',
