@@ -1,11 +1,19 @@
+import nltk
 import numpy
 import torch
+from nltk.sentiment import SentimentIntensityAnalyzer
 from pyspark.sql.functions import *
 from pyspark.sql.dataframe import DataFrame
+from sentence_transformers import SentenceTransformer
+from transformers import BertTokenizer, BertModel
 
-from config import sentence_transformer_model, sia, tokenizer, bert_model
+nltk.download("vader_lexicon")
 
+sia = SentimentIntensityAnalyzer()
+sentence_transformer_model = SentenceTransformer("all-MiniLM-L6-v2")
 
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+bert_model = BertModel.from_pretrained('bert-base-uncased')
 def analyze_sentiment(text):
     """Compute sentiment score using VADER"""
     if text:

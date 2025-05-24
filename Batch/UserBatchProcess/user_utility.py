@@ -1,8 +1,8 @@
 from pyspark.sql.functions import *
 import numpy as np
+from sentence_transformers import SentenceTransformer
 
-from config import sentence_transformer_model
-
+sentence_transformer_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 def vectorize(ctr, user_profile, browsing_behavior, purchase_behavior, product_preferences,
               loyalty_score, engagement_score, preference_stability, price_sensitivity, category_exploration, brand_loyalty,

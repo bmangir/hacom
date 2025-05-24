@@ -8,7 +8,7 @@ from pyspark.sql.types import FloatType, MapType, Row
 
 from config import MONGO_PRODUCTS_DB, client, NEW_ITEM_FEATURES_HOST as ITEM_FEATURES_HOST, NEW_ITEM_CONTENTS_HOST as ITEM_CONTENTS_HOST
 from Batch.models import item_model as ItemModel
-from Batch.ItemBatchProcess import utility
+from Batch.ItemBatchProcess import item_utility
 from utilities.spark_utility import create_spark_session
 
 
@@ -31,7 +31,7 @@ class ItemBatchService:
         self.preprocess_data()
 
     def preprocess_data(self):
-        sentiment_udf = udf(utility.analyze_sentiment, FloatType())
+        sentiment_udf = udf(item_utility.analyze_sentiment, FloatType())
         self.reviews_df = self.reviews_df.withColumn("sentiment_score", sentiment_udf(col("review_text")))
         self.orders_df = self.orders_df.withColumn("order_date_as_day",
                                                    date_format(from_unixtime(col("order_date") / 1000), "yyyy-MM-dd")) \
@@ -172,7 +172,7 @@ class ItemBatchService:
         """Textual and Visual Representations"""
 
         contents_of_products = self.products_df.drop("stock_quantity", "rating", "image_url", "author")
-        detailed_products_df = utility._extract_details_column(contents_of_products.select("details", "product_id")).select(
+        detailed_products_df = item_utility._extract_details_column(contents_of_products.select("details", "product_id")).select(
             "details", "product_id")
         contents_of_products = contents_of_products \
             .withColumn("colors",
@@ -632,7 +632,7 @@ class ItemBatchService:
 
     def define_item_contents(self, basic_item_info_df, content_df):
         item_content_df = basic_item_info_df.join(content_df, "product_id", "left")
-        item_content_df = utility._create_product_contents(item_content_df)
+        item_content_df = item_utility._create_product_contents(item_content_df)
 
         return item_content_df.select("product_id", "content", "metadata")
 
@@ -657,7 +657,7 @@ class ItemBatchService:
 
         item_content_df = self.define_item_contents(basic_item_information, content_df)
         item_content_df = item_content_df.withColumn("agg_time", (unix_timestamp(current_timestamp()) * 1000))
-        distributed_content_df = utility.distribution_of_df_by_range(item_content_df, range=1)
+        distributed_content_df = item_utility.distribution_of_df_by_range(item_content_df, range=1)
 
         top_n_products_by_cat = top_n_products_by_cat.withColumn("agg_time", (unix_timestamp(current_timestamp()) * 1000))
 
@@ -674,7 +674,7 @@ class ItemBatchService:
             .join(customer_satisfaction_score_df, "product_id", "left") \
             .withColumn("agg_time", (unix_timestamp(current_timestamp()) * 1000))
 
-        distributed_features_df = utility.distribution_of_df_by_range(transformed_features_df, range=1)
+        distributed_features_df = item_utility.distribution_of_df_by_range(transformed_features_df, range=1)
 
         return distributed_content_df, top_n_products_by_cat, distributed_features_df
 
@@ -689,7 +689,7 @@ class ItemBatchService:
 
     def vectorize_contents(self, agg_contents_df: DataFrame) -> DataFrame | None:
         vectorize_udf = udf(
-            lambda content: utility.vectorize_item_contents({"content": content}) if content else [],
+            lambda content: item_utility.vectorize_item_contents({"content": content}) if content else [],
             ArrayType(FloatType())
         )
         vectorized_df = agg_contents_df \
@@ -699,7 +699,7 @@ class ItemBatchService:
         return vectorized_df.select("id", "values", "metadata")
 
     def vectorize_features(self, agg_features_df: DataFrame) -> DataFrame | None:
-        vectorize_udf = udf(utility.vectorize_item_features, ArrayType(FloatType()))
+        vectorize_udf = udf(item_utility.vectorize_item_features, ArrayType(FloatType()))
         vectorized_df = agg_features_df \
             .withColumn("values", vectorize_udf(
                 col("purchase_count"), col("view_count"), col("wishlist_count"), col("cart_addition_count"),

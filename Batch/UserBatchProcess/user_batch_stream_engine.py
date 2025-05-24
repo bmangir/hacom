@@ -5,7 +5,7 @@ from pyspark.sql import Window
 from pyspark.sql.functions import *
 from pyspark.sql.types import FloatType
 
-from Batch.UserBatchProcess import utility
+from Batch.UserBatchProcess import user_utility
 from Batch.models import user_model as UserModel
 from utilities.spark_utility import create_spark_session
 
@@ -28,7 +28,7 @@ class UserBatchService:
         self.preprocess_data()
 
     def preprocess_data(self):
-        extract_place_name_udf = udf(utility.extract_place_name, StringType())
+        extract_place_name_udf = udf(user_utility.extract_place_name, StringType())
         self.users_df = self.users_df \
             .withColumn("age", (datediff(current_date(), col("birth_date")) / 365).cast("int")) \
             .withColumn("location", extract_place_name_udf(col("address"))) \
@@ -607,7 +607,7 @@ class UserBatchService:
         category_exploration_df = self._get_category_exploration()
         brand_loyalty_df = self._get_brand_loyalty()
 
-        transformed_df = utility.transform_data(user_profile, browsing_behavior, purchase_behavior, product_preferences, ctr_df)
+        transformed_df = user_utility.transform_data(user_profile, browsing_behavior, purchase_behavior, product_preferences, ctr_df)
 
         transformed_df = transformed_df \
             .join(loyalty_score_df, "user_id", "left") \
@@ -617,11 +617,11 @@ class UserBatchService:
             .join(category_exploration_df, "user_id", "left") \
             .join(brand_loyalty_df, "user_id", "left")
         
-        distributed_df = utility.distribution_of_df_by_range(transformed_df, 1)
+        distributed_df = user_utility.distribution_of_df_by_range(transformed_df, 1)
         return distributed_df
 
     def vectorize(self, agg_df: DataFrame) -> DataFrame:
-        vectorize_udf = udf(utility.vectorize, ArrayType(FloatType()))
+        vectorize_udf = udf(user_utility.vectorize, ArrayType(FloatType()))
 
         vectorized_df = agg_df.withColumn(
             "values",
