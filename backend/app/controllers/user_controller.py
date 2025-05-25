@@ -3,7 +3,7 @@ import math
 
 from . import login_required
 from ..services.auth_service import AuthService
-from ..services.service_locator import recommendation_service, tracking_service, session_service, user_service
+from ..services.service_locator import tracking_service, session_service, user_service, USER_RECOMMENDATION_SERVICE
 
 user_blueprint = Blueprint('user_blueprint', __name__)
 
@@ -15,13 +15,19 @@ def register():
 
     try:
         data = request.get_json()
-
-        # Validate required fields
-        required_fields = ['email', 'password', 'first_name', 'last_name']
-        if not all(field in data for field in required_fields):
+        if not data:
             return jsonify({
                 "success": False,
-                "message": "Missing required fields"
+                "message": "No data provided"
+            }), 400
+
+        # Validate required fields
+        required_fields = ['email', 'password', 'first_name', 'last_name', 'gender', 'birthdate']
+        missing_fields = [field for field in required_fields if field not in data or not data[field]]
+        if missing_fields:
+            return jsonify({
+                "success": False,
+                "message": f"Missing required fields: {', '.join(missing_fields)}"
             }), 400
 
         # Register user
@@ -32,7 +38,7 @@ def register():
             data['last_name'],
             data['gender'],
             data['birthdate'],
-            data['address']
+            data.get('address')  # Address is optional
         )
 
         if error:
@@ -57,9 +63,10 @@ def register():
         }), 201
 
     except Exception as e:
+        print(f"Registration error: {str(e)}")
         return jsonify({
             "success": False,
-            "message": str(e)
+            "message": f"Registration failed: {str(e)}"
         }), 500
 
 
@@ -137,11 +144,10 @@ def profile():
 
     try:
         # Get recently visited products
-        #recent_products = recommendation_service.get_recently_viewed_products(user_id, limit=10)
-        recent_products = user_service.get_recently_viewed_products(user_id=user_id, limit=10)
+        recent_products = USER_RECOMMENDATION_SERVICE.get_recently_viewed_products(user_id, limit=10)
 
         # Get purchased products
-        purchased_products = recommendation_service.get_purchased_products(user_id, limit=10)
+        purchased_products = USER_RECOMMENDATION_SERVICE.get_purchased_products(user_id)
 
         return render_template(
             "user_profile.html",
@@ -168,7 +174,7 @@ def all_visits():
 
     try:
         # Get visited products with filters
-        visited_products = user_service.get_visited_products(
+        visited_products = USER_RECOMMENDATION_SERVICE.get_visited_products(
             user_id=user_id,
             date_range=date_range,
             sort_by=sort_by,
@@ -227,7 +233,6 @@ def all_purchases():
         )
 
         # Get pagination info
-        #total_products = user_service.get_total_purchased_products(user_id, date_range)
         total_pages = (purchased_products['total'] + per_page - 1) // per_page
 
         has_prev = page > 1
@@ -289,3 +294,95 @@ def get_visited_products():
     except Exception as e:
         print(f"Error loading visited products: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+
+@user_blueprint.route("/my-reviews")
+@login_required
+def my_reviews():
+    user_id = session.get('user_id')
+    page = request.args.get('page', 1, type=int)
+    date_range = request.args.get('date_range', 'all')
+    sort_by = request.args.get('sort_by', 'recent')
+    per_page = 12  # Number of reviews per page
+
+    try:
+        # Get user reviews with filters
+        reviews = user_service.get_user_reviews(
+            user_id=user_id,
+            date_range=date_range,
+            sort_by=sort_by,
+            page=page,
+            per_page=per_page
+        )
+
+        # Get pagination info
+        total_pages = (reviews['total'] + per_page - 1) // per_page
+
+        has_prev = page > 1
+        has_next = page < total_pages
+
+        return render_template(
+            "user_reviews.html",
+            reviews=reviews.get('reviews', []),
+            page=page,
+            total_pages=total_pages,
+            has_prev=has_prev,
+            has_next=has_next,
+            date_range=date_range,
+            sort_by=sort_by
+        )
+    except Exception as e:
+        print(f"Error loading reviews: {str(e)}")
+        return render_template(
+            "user_reviews.html",
+            reviews=[],
+            page=1,
+            total_pages=1,
+            has_prev=False,
+            has_next=False,
+            date_range='all',
+            sort_by='recent'
+        )
+
+
+@user_blueprint.route("/my-profile/settings", methods=["GET", "POST"])
+@login_required
+def settings():
+    user_id = session.get('user_id')
+    
+    if request.method == "POST":
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({
+                    "success": False,
+                    "message": "No data provided"
+                }), 400
+
+            # Update user settings
+            result, error = user_service.update_user_settings(user_id, data)
+            
+            if error:
+                return jsonify({
+                    "success": False,
+                    "message": error
+                }), 400
+
+            return jsonify({
+                "success": True,
+                "message": "Settings updated successfully"
+            }), 200
+
+        except Exception as e:
+            return jsonify({
+                "success": False,
+                "message": str(e)
+            }), 500
+
+    try:
+        # Get user settings
+        settings = user_service.get_user_settings(user_id)
+        return render_template("user_settings.html", settings=settings)
+    except Exception as e:
+        print(f"Error loading settings: {str(e)}")
+        return render_template("user_settings.html", settings={})

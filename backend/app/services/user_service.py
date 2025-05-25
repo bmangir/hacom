@@ -1,9 +1,12 @@
+import re
 import time
+import json
 
 import pandas as pd
 from datetime import datetime, timedelta
 
-from backend.config.config import MONGO_BROWSING_DB, MONGO_PRODUCTS_DB
+from backend.app.models.user_models import ProductDetails
+from backend.config import MONGO_BROWSING_DB, MONGO_PRODUCTS_DB, client
 from databases.mongo.mongo_connector import MongoConnector
 from databases.postgres.neon_postgres_connector import NeonPostgresConnector
 
@@ -33,16 +36,9 @@ class UserService:
             if conn:
                 NeonPostgresConnector.return_connection(conn)
 
-    def get_recently_viewed_products(self, user_id, limit=10):
-        """Get recently viewed products for a user."""
+    """def get_recently_viewed_products(self, user_id, limit=10):
+        Get recently viewed products for a user.
         try:
-            # Ensure data is loaded
-            mongo_conn = MongoConnector()
-            client = mongo_conn.get_client()
-            if not client:
-                print("MongoDB connection failed")
-                return
-
             browsing_collection = client[MONGO_BROWSING_DB]['browsing_history']
             browsing_df = pd.DataFrame(list(browsing_collection.find({}, {'_id': 0})))
 
@@ -66,6 +62,47 @@ class UserService:
             return products
         except Exception as e:
             print(f"Error getting recently viewed products: {str(e)}")
+            return []"""
+    def get_recently_viewed_products(self, user_id, limit=10):
+        """Get recently viewed products for a user."""
+        try:
+            browsing_collection = client[MONGO_BROWSING_DB]['browsing_history']
+
+            # MongoDB'de filtrele, sıralayıp sınırla
+            cursor = browsing_collection.find(
+                {
+                    'user_id': user_id,
+                    'page_url': {'$regex': '/product/'}
+                },
+                {'_id': 0, 'page_url': 1, 'timestamp': 1}
+            ).sort('timestamp', -1).limit(limit * 2)  # limit*2: to avoid for same product
+
+            product_ids = []
+            seen = set()
+
+            for doc in cursor:
+                match = re.search(r'/product/([^/?#]+)', doc['page_url'])
+                if match:
+                    pid = match.group(1)
+                    if pid not in seen:
+                        seen.add(pid)
+                        product_ids.append(pid)
+                if len(product_ids) >= limit:
+                    break
+
+            # Ürün detaylarını çek
+            products = []
+            for prod_id in product_ids:
+                product = client[MONGO_PRODUCTS_DB]['products'].find_one(
+                    {'product_id': prod_id}, {'_id': 0}
+                )
+                if product:
+                    products.append(product)
+
+            return products
+
+        except Exception as e:
+            print(f"Error getting recently viewed products: {str(e)}")
             return []
 
     def get_purchased_products(self, user_id, date_range='all', sort_by='recent', page=1, per_page=12):
@@ -81,7 +118,7 @@ class UserService:
             select_clause = """
                 SELECT o.order_id, o.product_id, o.quantity, o.order_date, o.total_amount,
                        r.review_id, status
-                FROM orders o
+                FROM orders o   
                 LEFT JOIN product_reviews r ON o.product_id = r.product_id AND o.user_id = r.user_id
             """
             where_clause = "WHERE o.user_id = %s"
@@ -120,30 +157,24 @@ class UserService:
             cursor.execute(query, params)
             orders = cursor.fetchall()
 
-            # Get product details from MongoDB
-            mongo_conn = MongoConnector()
-            client = mongo_conn.get_client()
-            if not client:
-                print("MongoDB connection failed")
-                return {'products': [], 'total': 0}
-
-            products_collection = client[MONGO_PRODUCTS_DB]['products']
+            #products_collection = client[MONGO_PRODUCTS_DB]['products']
             
             # Combine order and product information
             products = []
             for order in orders:
                 order_id, product_id, quantity, order_date, total_amount, review_id, status = order
-                
+
                 # Get product details from MongoDB
-                product = products_collection.find_one({'product_id': product_id}, {'_id': 0})
+                product = ProductDetails.objects(product_id=product_id).first()
                 if product:
                     # Add order details to product info
-                    product['purchase_date'] = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(order_date / 1000))
-                    product['quantity'] = quantity
-                    product['total_price'] = float(total_amount)
-                    product['has_review'] = review_id is not None
-                    product['status'] = status
-                    products.append(product)
+                    product_data = product.to_mongo().to_dict()
+                    product_data['purchase_date'] = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(order_date / 1000))
+                    product_data['quantity'] = quantity
+                    product_data['total_price'] = float(total_amount)
+                    product_data['has_review'] = review_id is not None
+                    product_data['status'] = status
+                    products.append(product_data)
 
             # Apply name sorting if needed
             if sort_by == 'name':
@@ -207,8 +238,6 @@ class UserService:
         """Get visited products with filtering and pagination."""
         try:
             # Connect to MongoDB
-            mongo_conn = MongoConnector()
-            client = mongo_conn.get_client()
             if not client:
                 print("MongoDB connection failed")
                 return {'products': [], 'total': 0}
@@ -269,11 +298,13 @@ class UserService:
             # Get product details
             products = []
             for visit in visits:
-                product = products_collection.find_one({'product_id': visit['_id']}, {'_id': 0})
+                #product = products_collection.find_one({'product_id': visit['_id']}, {'_id': 0})
+                product = ProductDetails.objects(product_id=visit['_id']).first()
                 if product:
-                    product['last_visit_date'] = visit['last_visit'].strftime('%Y-%m-%d %H:%M:%S')
-                    product['visit_count'] = visit['visit_count']
-                    products.append(product)
+                    product_data = product.to_mongo().to_dict()
+                    product_data['last_visit_date'] = visit['last_visit'].strftime('%Y-%m-%d %H:%M:%S')
+                    product_data['visit_count'] = visit['visit_count']
+                    products.append(product_data)
 
             # Apply name sorting if needed (since it requires product details)
             if sort_by == 'name':
@@ -292,13 +323,6 @@ class UserService:
     def get_total_visited_products(self, user_id, date_range='all'):
         """Get total count of visited products for pagination."""
         try:
-            # Connect to MongoDB
-            mongo_conn = MongoConnector()
-            client = mongo_conn.get_client()
-            if not client:
-                print("MongoDB connection failed")
-                return 0
-
             browsing_collection = client[MONGO_BROWSING_DB]['browsing_history']
 
             # Base query
@@ -321,3 +345,229 @@ class UserService:
         except Exception as e:
             print(f"Error getting total visited products: {str(e)}")
             return 0
+
+    def get_user_reviews(self, user_id, date_range='all', sort_by='recent', page=1, per_page=12):
+        """Get user reviews with filtering and pagination."""
+        conn = None
+        cursor = None
+        try:
+            # Connect to PostgreSQL
+            conn = NeonPostgresConnector.get_connection()
+            cursor = conn.cursor()
+
+            # Base query parts
+            select_clause = """
+                SELECT r.review_id, r.product_id, r.rating, r.comment, r.review_date,
+                       o.order_id, o.quantity, o.total_amount
+                FROM product_reviews r
+                LEFT JOIN orders o ON r.product_id = o.product_id AND r.user_id = o.user_id
+            """
+            where_clause = "WHERE r.user_id = %s"
+            params = [user_id]
+
+            # Apply date range filter
+            if date_range != 'all':
+                date_filter = {
+                    'today': datetime.now().replace(hour=0, minute=0, second=0, microsecond=0),
+                    'week': datetime.now() - timedelta(days=7),
+                    'month': datetime.now() - timedelta(days=30)
+                }
+                if date_range in date_filter:
+                    where_clause += " AND r.review_date >= %s"
+                    params.append(date_filter[date_range])
+
+            # Apply sorting
+            order_clause = ""
+            if sort_by == 'recent':
+                order_clause = "ORDER BY r.review_date DESC"
+            elif sort_by == 'rating-high':
+                order_clause = "ORDER BY r.rating DESC"
+            elif sort_by == 'rating-low':
+                order_clause = "ORDER BY r.rating ASC"
+
+            # Add pagination
+            limit_clause = "LIMIT %s OFFSET %s"
+            params.extend([per_page, (page - 1) * per_page])
+
+            # Combine query
+            query = f"{select_clause} {where_clause} {order_clause} {limit_clause}"
+            
+            # Execute query
+            cursor.execute(query, params)
+            reviews = cursor.fetchall()
+
+            # Get product details and combine with review information
+            result_reviews = []
+            for review in reviews:
+                review_id, product_id, rating, comment, review_date, order_id, quantity, total_amount = review
+
+                # Get product details from MongoDB
+                product = ProductDetails.objects(product_id=product_id).first()
+                if product:
+                    # Add review details to product info
+                    review_data = product.to_mongo().to_dict()
+                    review_data.update({
+                        'review_id': review_id,
+                        'rating': rating,
+                        'comment': comment,
+                        'review_date': time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(review_date / 1000)),
+                        'order_id': order_id,
+                        'quantity': quantity,
+                        'total_amount': float(total_amount) if total_amount else None
+                    })
+                    result_reviews.append(review_data)
+
+            # Get total count for pagination
+            count_query = f"SELECT COUNT(*) FROM product_reviews r {where_clause}"
+            cursor.execute(count_query, [user_id])
+            total_count = cursor.fetchone()[0]
+
+            return {'reviews': result_reviews, 'total': total_count}
+
+        except Exception as e:
+            print(f"Error getting user reviews: {str(e)}")
+            return {'reviews': [], 'total': 0}
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                NeonPostgresConnector.return_connection(conn)
+
+    def get_user_settings(self, user_id):
+        """Get all user settings and preferences."""
+        conn = None
+        cursor = None
+        try:
+            # Connect to PostgreSQL
+            conn = NeonPostgresConnector.get_connection()
+            cursor = conn.cursor()
+
+            # Get user profile information
+            profile_query = """
+                SELECT u.email, u.first_name, u.last_name, u.gender, u.birthdate, u.address,
+                       u.phone_number, u.profile_picture, u.created_at,
+                       u.notification_preferences, u.privacy_settings, u.language_preference,
+                       u.currency_preference, u.timezone
+                FROM users u
+                WHERE u.user_id = %s
+            """
+            cursor.execute(profile_query, [user_id])
+            profile = cursor.fetchone()
+
+            if not profile:
+                return {}
+
+            # Convert profile data to dictionary
+            settings = {
+                'email': profile[0],
+                'first_name': profile[1],
+                'last_name': profile[2],
+                'gender': profile[3],
+                'birthdate': profile[4].strftime('%Y-%m-%d') if profile[4] else None,
+                'address': profile[5],
+                'phone_number': profile[6],
+                'profile_picture': profile[7],
+                'created_at': profile[8].strftime('%Y-%m-%d %H:%M:%S') if profile[8] else None,
+                'notification_preferences': profile[9] or {},
+                'privacy_settings': profile[10] or {},
+                'language_preference': profile[11] or 'en',
+                'currency_preference': profile[12] or 'USD',
+                'timezone': profile[13] or 'UTC'
+            }
+
+            return settings
+
+        except Exception as e:
+            print(f"Error getting user settings: {str(e)}")
+            return {}
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                NeonPostgresConnector.return_connection(conn)
+
+    def update_user_settings(self, user_id, data):
+        """Update user settings and preferences."""
+        conn = None
+        cursor = None
+        try:
+            # Connect to PostgreSQL
+            conn = NeonPostgresConnector.get_connection()
+            cursor = conn.cursor()
+
+            # Validate required fields
+            required_fields = ['email', 'first_name', 'last_name']
+            missing_fields = [field for field in required_fields if field not in data]
+            if missing_fields:
+                return None, f"Missing required fields: {', '.join(missing_fields)}"
+
+            # Validate email format
+            if not re.match(r"[^@]+@[^@]+\.[^@]+", data['email']):
+                return None, "Invalid email format"
+
+            # Check if email is already taken by another user
+            cursor.execute(
+                "SELECT user_id FROM users WHERE email = %s AND user_id != %s",
+                [data['email'], user_id]
+            )
+            if cursor.fetchone():
+                return None, "Email is already taken"
+
+            # Update user profile
+            update_query = """
+                UPDATE users
+                SET email = %s,
+                    first_name = %s,
+                    last_name = %s,
+                    gender = %s,
+                    birthdate = %s,
+                    address = %s,
+                    phone_number = %s,
+                    notification_preferences = %s,
+                    privacy_settings = %s,
+                    language_preference = %s,
+                    currency_preference = %s,
+                    timezone = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = %s
+                RETURNING user_id
+            """
+            
+            cursor.execute(update_query, [
+                data['email'],
+                data['first_name'],
+                data['last_name'],
+                data.get('gender'),
+                data.get('birthdate'),
+                data.get('address'),
+                data.get('phone_number'),
+                json.dumps(data.get('notification_preferences', {})),
+                json.dumps(data.get('privacy_settings', {})),
+                data.get('language_preference', 'en'),
+                data.get('currency_preference', 'USD'),
+                data.get('timezone', 'UTC'),
+                user_id
+            ])
+
+            # Handle profile picture update if provided
+            if 'profile_picture' in data and data['profile_picture']:
+                # Here you would typically handle file upload and storage
+                # For now, we'll just update the URL
+                cursor.execute(
+                    "UPDATE users SET profile_picture = %s WHERE user_id = %s",
+                    [data['profile_picture'], user_id]
+                )
+
+            conn.commit()
+            return True, None
+
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            print(f"Error updating user settings: {str(e)}")
+            return None, str(e)
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                NeonPostgresConnector.return_connection(conn)

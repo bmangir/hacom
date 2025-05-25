@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}My Reviews{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">My Reviews</h1>
+
+    <!-- Filters -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="btn-group" role="group">
+                <a href="{{ url_for('user_blueprint.my_reviews', date_range='all', sort_by=sort_by) }}" 
+                   class="btn btn-outline-primary {% if date_range == 'all' %}active{% endif %}">
+                    All Time
+                </a>
+                <a href="{{ url_for('user_blueprint.my_reviews', date_range='month', sort_by=sort_by) }}" 
+                   class="btn btn-outline-primary {% if date_range == 'month' %}active{% endif %}">
+                    Last Month
+                </a>
+                <a href="{{ url_for('user_blueprint.my_reviews', date_range='week', sort_by=sort_by) }}" 
+                   class="btn btn-outline-primary {% if date_range == 'week' %}active{% endif %}">
+                    Last Week
+                </a>
+                <a href="{{ url_for('user_blueprint.my_reviews', date_range='today', sort_by=sort_by) }}" 
+                   class="btn btn-outline-primary {% if date_range == 'today' %}active{% endif %}">
+                    Today
+                </a>
+            </div>
+        </div>
+        <div class="col-md-6 text-end">
+            <div class="btn-group" role="group">
+                <a href="{{ url_for('user_blueprint.my_reviews', date_range=date_range, sort_by='recent') }}" 
+                   class="btn btn-outline-secondary {% if sort_by == 'recent' %}active{% endif %}">
+                    Most Recent
+                </a>
+                <a href="{{ url_for('user_blueprint.my_reviews', date_range=date_range, sort_by='rating-high') }}" 
+                   class="btn btn-outline-secondary {% if sort_by == 'rating-high' %}active{% endif %}">
+                    Highest Rating
+                </a>
+                <a href="{{ url_for('user_blueprint.my_reviews', date_range=date_range, sort_by='rating-low') }}" 
+                   class="btn btn-outline-secondary {% if sort_by == 'rating-low' %}active{% endif %}">
+                    Lowest Rating
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reviews List -->
+    <div class="row">
+        {% if reviews %}
+            {% for review in reviews %}
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="row g-0">
+                            <div class="col-md-4">
+                                <img src="{{ review.image_url }}" class="img-fluid rounded-start h-100 object-fit-cover" 
+                                     alt="{{ review.product_name }}">
+                            </div>
+                            <div class="col-md-8">
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ review.product_name }}</h5>
+                                    <div class="mb-2">
+                                        {% for i in range(5) %}
+                                            {% if i < review.rating %}
+                                                <i class="fas fa-star text-warning"></i>
+                                            {% else %}
+                                                <i class="far fa-star text-warning"></i>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                    <p class="card-text">{{ review.comment }}</p>
+                                    <p class="card-text">
+                                        <small class="text-muted">Reviewed on {{ review.review_date }}</small>
+                                    </p>
+                                    {% if review.order_id %}
+                                        <p class="card-text">
+                                            <small class="text-muted">
+                                                Order #{{ review.order_id }} - 
+                                                Quantity: {{ review.quantity }} - 
+                                                Total: ${{ "%.2f"|format(review.total_amount) }}
+                                            </small>
+                                        </p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    You haven't written any reviews yet.
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('user_blueprint.my_reviews', page=page-1, date_range=date_range, sort_by=sort_by) }}">
+                            Previous
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">Previous</span>
+                    </li>
+                {% endif %}
+
+                {% for p in range(1, total_pages + 1) %}
+                    <li class="page-item {% if p == page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('user_blueprint.my_reviews', page=p, date_range=date_range, sort_by=sort_by) }}">
+                            {{ p }}
+                        </a>
+                    </li>
+                {% endfor %}
+
+                {% if has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('user_blueprint.my_reviews', page=page+1, date_range=date_range, sort_by=sort_by) }}">
+                            Next
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">Next</span>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+</div>
+{% endblock %} 
