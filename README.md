@@ -1,9 +1,13 @@
+# Branches
+
+- `backandfrontendBranch`: Backend and Frontend
+- `sparkBranch`: Batch and Real-time with Spark-Kafka
 
 # 🧠 Real-Time Personalized Recommendation System for E-commerce
 
 This project aims to enhance user experience and boost sales in e-commerce platforms by providing personalized product recommendations using both batch-time and real-time processing. By analyzing user behavior—including browsing, purchasing, and wishlist activity—the system intelligently suggests products users are likely to buy, even before they search for them.
 
-> “AI that knows what you want.”
+> "AI that knows what you want."
 
 ---
 
@@ -114,4 +118,4 @@ Department of Computer Engineering
 
 ## 📬 Contact
 
-For questions, reach out via [email/contact method if you'd like].
+For questions, reach out via [berkantmangir23@gmail.com](berkantmangir23@gmail.com).
