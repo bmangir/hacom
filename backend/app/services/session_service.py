@@ -1,6 +1,7 @@
 import time
 import user_agents
 from databases.postgres.neon_postgres_connector import NeonPostgresConnector
+from backend.utils.utils import kafka_producer_util
 
 class SessionService:
     @staticmethod
@@ -16,7 +17,6 @@ class SessionService:
             cursor.execute("SELECT nextval('session_id_seq')")
             seq_id = cursor.fetchone()[0]
             session_id = f"S{seq_id}"
-            print(session_id)
             
             # Parse user agent
             user_agent = user_agents.parse(request.user_agent.string)
@@ -38,6 +38,22 @@ class SessionService:
                 f"{user_agent.browser.family} {user_agent.browser.version_string}"
             ))
             
+            # Send session creation event to Kafka
+            event_details = {
+                "session_id": session_id,
+                "location": location,
+                "device_type": str(user_agent.device.family),
+                "browser_info": f"{user_agent.browser.family} {user_agent.browser.version_string}"
+            }
+            kafka_producer_util.send_event(
+                kafka_producer_util.format_interaction_event(
+                    user_id=user_id,
+                    product_id=None,
+                    event_type="create_session",
+                    details=event_details
+                )
+            )
+            
             conn.commit()
             return session_id
             
@@ -53,7 +69,7 @@ class SessionService:
                 NeonPostgresConnector.return_connection(conn)
                 
     @staticmethod
-    def end_session(session_id):
+    def end_session(user_id, session_id):
         """End a session by setting its end time."""
         conn = None
         cursor = None
@@ -66,6 +82,20 @@ class SessionService:
                 SET end_time = %s
                 WHERE session_id = %s
             """, (int(time.time()), session_id))
+            
+            # Send session end event to Kafka
+            event_details = {
+                "session_id": session_id,
+                "end_time": int(time.time())
+            }
+            kafka_producer_util.send_event(
+                kafka_producer_util.format_interaction_event(
+                    user_id=user_id,
+                    product_id=None,
+                    event_type="end_session",
+                    details=event_details
+                )
+            )
             
             conn.commit()
             return True
