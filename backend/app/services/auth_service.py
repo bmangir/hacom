@@ -1,5 +1,9 @@
+import json
+
 import bcrypt
-from datetime import datetime, timedelta
+from datetime import timedelta, datetime
+
+import requests
 from flask_jwt_extended import create_access_token
 from flask import current_app
 
@@ -52,7 +56,12 @@ class AuthService:
 
     @staticmethod
     def register(email, password, first_name, last_name, gender, birthdate, address=None):
+        # Validate required frontend data
+        if not email or not password or not first_name or not last_name or not gender or not birthdate:
+            return None, "Missing required fields"
+        
         #birthdate = datetime.strptime(birthdate, "%Y-%m-%d")
+        temp_gender = gender
         if gender == "Male" or gender == "male":
             gender = "M"
         elif gender == "Female" or  gender == "female":
@@ -85,6 +94,33 @@ class AuthService:
                 (email, password_hash.decode('utf-8'), first_name, last_name, gender, birthdate, address)
             )
             user_id = cursor.fetchone()[0]
+            
+            # Try to validate birthdate format before proceeding with other operations
+            try:
+                birthdate_obj = datetime.strptime(birthdate, "%Y-%m-%d")
+            except ValueError:
+                conn.rollback()
+                return None, "Invalid birthdate format. Use YYYY-MM-DD format."
+            
+            # convert user data to json
+            user_json = {
+                "user_id": user_id,
+                "gender": temp_gender,
+                "age": int((datetime.now() - birthdate_obj).days / 365),
+                "location": address
+            }
+
+            # Only commit to database if the API call succeeds
+            try:
+                response = requests.post(url="http://127.0.0.1:8081/api/v1/stream/new_registration_computer", json=user_json)
+                if response.status_code != 200:
+                    conn.rollback()
+                    return None, "Failed to send registration data to the streaming service"
+            except requests.RequestException:
+                conn.rollback()
+                return None, "Failed to connect to the streaming service"
+            
+            # If we get here, everything succeeded - commit the transaction
             conn.commit()
 
             # Create access token
