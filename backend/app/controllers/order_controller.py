@@ -1,8 +1,9 @@
 from flask import Blueprint, jsonify, request, render_template, session, redirect, url_for
 from . import login_required
-from ..services.service_locator import cart_service, order_service
+from ..services.service_locator import cart_service, order_service, tracking_service
 from ..services.order_service import OrderService
 from ..services.cart_service import CartService
+import time
 
 order_bp = Blueprint('order', __name__)
 
@@ -12,12 +13,33 @@ order_bp = Blueprint('order', __name__)
 def checkout_page():
     """Render the checkout page."""
     try:
-        cart_items = cart_service.get_cart_items(session['user_id'])
+        user_id = session['user_id']
+        cart_items = cart_service.get_cart_items(user_id)
         if not cart_items.get("items"):
             return redirect(url_for('cart_wishlist_controller_blueprint.view_cart'))
         
+        # Track checkout page view
+        current_time = time.time()
+        last_page_time = session.get('last_page_time')
+        duration = int(current_time - last_page_time) if last_page_time else None
+        
+        tracking_service.track_user_action(
+            user_id=user_id,
+            session_id=session.get('session_id'),
+            action='view_checkout',
+            page_url=request.path,
+            referrer=request.referrer,
+            duration_seconds=duration,
+            additional_data={
+                'cart_item_count': len(cart_items.get("items", [])),
+                'cart_items': [item['product_id'] for item in cart_items.get("items", [])]
+            }
+        )
+        
+        # Update last page time
+        session['last_page_time'] = current_time
+        
         # Calculate totals
-        #subtotal = sum(item['price'] * item['quantity'] for item in cart_items)
         subtotal = 0
         for item in cart_items.get('items'):
             subtotal += item['price'] * item['quantity']
@@ -56,6 +78,24 @@ def process_checkout():
             payment_method=data['payment_method']
         )
         
+        # Track order placement
+        tracking_service.track_user_action(
+            user_id=user_id,
+            session_id=session.get('session_id'),
+            action='place_order',
+            page_url=request.path,
+            referrer=request.referrer,
+            additional_data={
+                'order_id': order['order_id'],
+                'order_total': order['total'],
+                'payment_method': data['payment_method'],
+                'purchased_items': [
+                    {'product_id': item['product_id'], 'quantity': item['quantity'], 'price': item['price']}
+                    for item in cart_items.get("items", [])
+                ]
+            }
+        )
+        
         # Clear cart after successful order
         cart_service.clear_cart(user_id)
         
@@ -74,12 +114,33 @@ def process_checkout():
 def order_confirmation(order_id):
     """Show the order confirmation page."""
     try:
+        user_id = session['user_id']
         order = order_service.get_order(order_id)
         
-        if not order or order['user_id'] != session['user_id']:
+        if not order or order['user_id'] != user_id:
             return "Order not found", 404
 
-        print(type(order.items()))
+        # Track order confirmation view
+        current_time = time.time()
+        last_page_time = session.get('last_page_time')
+        duration = int(current_time - last_page_time) if last_page_time else None
+        
+        tracking_service.track_user_action(
+            user_id=user_id,
+            session_id=session.get('session_id'),
+            action='view_order_confirmation',
+            page_url=request.path,
+            referrer=request.referrer,
+            duration_seconds=duration,
+            additional_data={
+                'order_id': order_id,
+                'order_total': order['total']
+            }
+        )
+        
+        # Update last page time
+        session['last_page_time'] = current_time
+
         return render_template('order_confirmation.html', order=order)
         
     except Exception as e:
@@ -92,6 +153,7 @@ def order_confirmation(order_id):
 def update_order_status(order_id):
     """Update the status of an order."""
     try:
+        user_id = session['user_id']
         data = request.get_json()
         new_status = data.get('status')
         
@@ -101,6 +163,18 @@ def update_order_status(order_id):
         success = order_service.update_order_status(order_id, new_status)
         
         if success:
+            # Track order status update
+            tracking_service.track_user_action(
+                user_id=user_id,
+                session_id=session.get('session_id'),
+                action='update_order_status',
+                page_url=request.path,
+                referrer=request.referrer,
+                additional_data={
+                    'order_id': order_id,
+                    'new_status': new_status
+                }
+            )
             return jsonify({'message': 'Order status updated successfully'})
         else:
             return jsonify({'error': 'Failed to update order status'}), 500

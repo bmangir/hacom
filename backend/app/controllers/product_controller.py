@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for
 from . import login_required
-from ..services.service_locator import recommendation_service, tracking_service, wishlist_service
+from ..services.service_locator import ITEM_RECOMMENDATION_SERVICE, tracking_service, wishlist_service, \
+    USER_RECOMMENDATION_SERVICE
 import time
 
 product_controller_blueprint = Blueprint('product_controller_blueprint', __name__)
@@ -8,7 +9,7 @@ product_controller_blueprint = Blueprint('product_controller_blueprint', __name_
 
 @product_controller_blueprint.route("/product/<product_id>")
 @login_required
-def product_details(product_id):
+def display_details(product_id):
     try:
         current_time = time.time()
         last_page_time = session.get('last_page_time')
@@ -28,7 +29,7 @@ def product_details(product_id):
         # Update last page time
         session['last_page_time'] = current_time
 
-        product = recommendation_service.get_product_details(product_id)
+        product = ITEM_RECOMMENDATION_SERVICE.get_product_details(product_id)
         if not product:
             return "Product not found", 404
 
@@ -36,17 +37,16 @@ def product_details(product_id):
         in_wishlist = wishlist_service.is_in_wishlist(user_id, product_id)
 
         # Get similar products and category-based recommendations
-        ibcf_similar_products = recommendation_service.recommend_items_by_ibcf(user_id)  # Primary model
-        category_products = recommendation_service.get_similar_products_by_category(
-            product['category'],
-            product_id,
-            limit=5
-        )
-        similar_users_liked_products = recommendation_service.similar_users_liked_recommendations(user_id, top_n=5)
-        content_based_recommended_products = recommendation_service.recommend_items_content_based(user_id, top_n=5)
-
-        vector_result = recommendation_service.content_based_recc_by_vectordb(product_id)
-        print(vector_result)
+        ibcf_similar_products = ITEM_RECOMMENDATION_SERVICE.get_ibcf_recommendations(product_id)  # Primary model
+        category_products = ITEM_RECOMMENDATION_SERVICE.get_top_n_product_based_on_category(item_id=product_id, category=product['category'])
+        similar_users_liked_products = ITEM_RECOMMENDATION_SERVICE.get_reviewed_based_items()
+        content_based_recommended_products = USER_RECOMMENDATION_SERVICE.get_content_based_recommendations(user_id=session["user_id"], num_recommendations=5)
+        bought_together = ITEM_RECOMMENDATION_SERVICE.get_bought_together_items(product_id)
+        
+        # Get additional recommendations
+        new_arrivals = ITEM_RECOMMENDATION_SERVICE.get_new_arrivals_items()
+        best_sellers = ITEM_RECOMMENDATION_SERVICE.get_best_seller_items()
+        seasonal_items = ITEM_RECOMMENDATION_SERVICE.get_seasonal_recommended_items()
 
         return render_template(
             "product_details.html",
@@ -55,7 +55,11 @@ def product_details(product_id):
             similar_products=ibcf_similar_products,
             category_products=category_products,
             similar_users_liked_products=similar_users_liked_products,
-            content_based_recommended_products=content_based_recommended_products
+            content_based_recommended_products=content_based_recommended_products,
+            bought_together=bought_together,
+            new_arrivals=new_arrivals,
+            best_sellers=best_sellers,
+            seasonal_items=seasonal_items
         )
 
     except Exception as e:
@@ -65,16 +69,18 @@ def product_details(product_id):
 
 @product_controller_blueprint.route("/product/<product_id>/reviews")
 @login_required
-def product_reviews(product_id):
+def display_reviews(product_id):
     """Show all reviews for a product"""
     try:
-        product = recommendation_service.get_product_details(product_id)
+        product = ITEM_RECOMMENDATION_SERVICE.get_product_details(product_id)
+        review_based_reccs = ITEM_RECOMMENDATION_SERVICE.get_reviewed_based_items()
         if not product:
             return "Product not found", 404
 
         return render_template(
             "product_reviews.html",
-            product=product
+            product=product,
+            review_based_reccs=review_based_reccs
         )
 
     except Exception as e:
@@ -108,10 +114,11 @@ def search():
         # Update last page time
         session['last_page_time'] = current_time
 
-        results = recommendation_service.search_products(query)
+        # Get search results with query refinement
+        results = ITEM_RECOMMENDATION_SERVICE.search(query)
         return render_template('search_results.html',
                                query=query,
-                               products=results.get('products', []))
+                               products=results)
     except Exception as e:
         print(f"Error searching products: {str(e)}")
         return "Error performing search", 500
@@ -139,7 +146,7 @@ def category_products(category_name):
         # Update last page time
         session['last_page_time'] = current_time
 
-        products = recommendation_service.get_products_by_category(category_name)
+        products = ITEM_RECOMMENDATION_SERVICE.get_products_by_category(category_name)
         return render_template("category_products.html",
                                category=category_name,
                                products=products)

@@ -1,6 +1,7 @@
 from flask import request, Blueprint, url_for, render_template, jsonify, session, redirect
 
-from backend.app.services.service_locator import USER_RECOMMENDATION_SERVICE, tracking_service
+from backend.app.services.service_locator import USER_RECOMMENDATION_SERVICE, tracking_service, \
+    ITEM_RECOMMENDATION_SERVICE
 
 main_controller_blueprint = Blueprint('main_controller_blueprint', __name__)
 
@@ -33,6 +34,14 @@ def home():
                 ubcf_recommended_products = USER_RECOMMENDATION_SERVICE.get_ubcf_recommendations(user_id=user_id, num_recommendations=10)
                 cb_recommended_products = USER_RECOMMENDATION_SERVICE.get_content_based_recommendations(user_id=user_id, num_recommendations=5)
                 most_visited_categories = USER_RECOMMENDATION_SERVICE.get_most_visited_categories(user_id=user_id)
+
+                # If no items found, get trending items
+                if len(cb_recommended_products) == 0:
+                    cb_recommended_products = ITEM_RECOMMENDATION_SERVICE.get_trending_items(user_id)
+
+                if len(most_visited_categories) == 0:
+                    most_visited_categories = ITEM_RECOMMENDATION_SERVICE.get_trending_categories(user_id)
+
             except Exception as e:
                 print(f"Error getting recommendations: {str(e)}")
         return render_template(
