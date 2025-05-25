@@ -1,6 +1,4 @@
 import json
-import traceback
-from concurrent.futures import ThreadPoolExecutor
 from pinecone import Pinecone
 from pyspark.sql.dataframe import DataFrame
 from config import NEW_PINECONE_API as PINECONE_API_KEY
@@ -25,7 +23,7 @@ class PineconeConnectionPool:
     def get_connection(self, host):
         with self._lock:
             if host not in self._connections:
-                self._connections[host] = Pinecone(api_key=PINECONE_API_KEY).Index(host=host, pool_threads=50)
+                self._connections[host] = Pinecone(api_key=PINECONE_API_KEY).Index(host=host, pool_threads=10)
             return self._connections[host]
 
 # Create a global connection pool instance
