@@ -31,7 +31,7 @@ def generate_cold_start_recommendations(user_id):
     """
 
     # Find the similar users of user_id
-    similarity_udf = find_similar_objects_udf(idx_host=USER_FEATURES_HOST, top_k=10)
+    similarity_udf = find_similar_objects_udf(idx_host=USER_FEATURES_HOST, top_k=3)
 
     # Get active users - users who have browsing behavior
     active_users = users_df.filter(
