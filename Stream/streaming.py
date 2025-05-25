@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+import requests
 
 from pyspark.sql import SparkSession, Window
 from pyspark.sql.functions import *
@@ -10,8 +11,8 @@ from config import MONGO_URI, MONGO_AGG_DATA_DB, NEW_USER_FEATURES_HOST as USER_
     MONGO_PRODUCTS_DB, CONFLUENT_BOOTSTRAP_SERVERS, CONFLUENT_INTERACTION_TOPIC, CONFLUENT_API_KEY, CONFLUENT_API_SECRET
 from utilities.spark_utility import read_from_mongodb, read_postgres_table, update_doc_in_mongodb
 from utilities.pinecone_utility import store_to_pinecone
-from Batch.UserBatchProcess.utility import vectorize
-from Batch.ItemBatchProcess.utility import vectorize_item_features
+from Batch.UserBatchProcess.user_utility import vectorize
+from Batch.ItemBatchProcess.item_utility import vectorize_item_features
 
 
 import logging
@@ -422,6 +423,18 @@ def update_item_features(product_id, event_type, details):
         print(f"Error updating item features in Pinecone/MongoDB: {str(e)}")
 
 
+def clear_cache():
+    """Make API call to clear cache"""
+    try:
+        response = requests.post('http://localhost:8080/api/clear-cache')
+        if response.status_code == 200:
+            print("Cache cleared successfully")
+        else:
+            print(f"Failed to clear cache: {response.json().get('error', 'Unknown error')}")
+    except Exception as e:
+        print(f"Error clearing cache: {str(e)}")
+
+
 def process_windowed_events(df, epoch_id):
     """Process events in 3-minute windows"""
     if df.isEmpty():
@@ -429,6 +442,9 @@ def process_windowed_events(df, epoch_id):
         return
 
     print(f"Processing batch for epoch {epoch_id} with {df.count()} events")
+
+    # Clear cache every 3 minutes
+    clear_cache()
 
     # Group events by user_id and product_id within the window
     windowed_events = df \
@@ -503,17 +519,7 @@ parsed_df.printSchema()
 
 # Process the parsed DataFrame in 3-minute windows
 parsed_df = parsed_df.withColumn("timestamp", current_timestamp())
-#windowed_df = parsed_df \
-#    .withWatermark("timestamp", "3 minutes") \
-#    .groupBy(
-#        window(col("timestamp"), "3 minutes"),
-#        col("user_id"),
-#        col("product_id"),
-#        col("event_type")
-#    ).agg(
-#        count("*").alias("event_count"),
-#        collect_list(col("details")).alias("details_list")
-#    )
+
 
 # Apply the data to the processing function
 query = parsed_df.writeStream \
@@ -523,14 +529,6 @@ query = parsed_df.writeStream \
     .option("checkpointLocation", checkpoint_dir) \
     .trigger(processingTime="30 seconds") \
     .start()
-
-#query = parsed_df.writeStream \
-#    .outputMode("append") \
-#    .format("console") \
-#    .option("truncate", "false") \
-#    .option("kafka.bootstrap.servers", CONFLUENT_BOOTSTRAP_SERVERS) \
-#    .option("subscribe", CONFLUENT_INTERACTION_TOPIC) \
-#    .start()
 
 # Add error handling
 try:
@@ -545,5 +543,4 @@ except Exception as e:
         "stack_trace": traceback.format_exc(),
         "timestamp": datetime.now()
     }
-    #client[MONGO_LOGS_DB]["streaming_errors"].insert_one(error_details)
-    raise  # Re-raise the exception after logging
+    raise
