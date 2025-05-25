@@ -228,7 +228,7 @@
                         <div class="product-slide">
                             <img src="{{ product.image_url }}" alt="{{ product.product_name }}" onerror="this.src='/static/images/default-product.jpg'">
                             <div class="product-info">
-                                <h3>{{ product.product_name }}</h3>
+                                <h3>{{ product.name }}</h3>
                                 <p class="product-price">${{ "%.2f"|format(product.price) }}</p>
                                 <button class="view-details-btn" onclick="window.location.href='/product/{{ product.product_id }}'">
                                     View Details

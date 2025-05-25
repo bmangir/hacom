@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Notifications{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title mb-4">Notifications</h5>
+
+                    {% if notifications %}
+                        <div class="list-group">
+                            {% for notification in notifications %}
+                                <div class="list-group-item {% if not notification.is_read %}list-group-item-primary{% endif %}">
+                                    <div class="d-flex w-100 justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1">
+                                                {% if notification.type == 'order' %}
+                                                    <i class="fas fa-shopping-cart text-primary me-2"></i>
+                                                {% elif notification.type == 'review' %}
+                                                    <i class="fas fa-star text-warning me-2"></i>
+                                                {% elif notification.type == 'system' %}
+                                                    <i class="fas fa-info-circle text-info me-2"></i>
+                                                {% elif notification.type == 'promotion' %}
+                                                    <i class="fas fa-tag text-success me-2"></i>
+                                                {% endif %}
+                                                {{ notification.message }}
+                                            </h6>
+                                            <small class="text-muted">{{ notification.created_at }}</small>
+                                        </div>
+                                        {% if not notification.is_read %}
+                                            <span class="badge bg-primary rounded-pill">New</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if notification.related_id %}
+                                        <div class="mt-2">
+                                            <a href="#" class="btn btn-sm btn-outline-primary">View Details</a>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Pagination -->
+                        {% if total_pages > 1 %}
+                            <nav aria-label="Page navigation" class="mt-4">
+                                <ul class="pagination justify-content-center">
+                                    {% if has_prev %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="{{ url_for('user_blueprint.notifications', page=page-1) }}">
+                                                Previous
+                                            </a>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item disabled">
+                                            <span class="page-link">Previous</span>
+                                        </li>
+                                    {% endif %}
+
+                                    {% for p in range(1, total_pages + 1) %}
+                                        <li class="page-item {% if p == page %}active{% endif %}">
+                                            <a class="page-link" href="{{ url_for('user_blueprint.notifications', page=p) }}">
+                                                {{ p }}
+                                            </a>
+                                        </li>
+                                    {% endfor %}
+
+                                    {% if has_next %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="{{ url_for('user_blueprint.notifications', page=page+1) }}">
+                                                Next
+                                            </a>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item disabled">
+                                            <span class="page-link">Next</span>
+                                        </li>
+                                    {% endif %}
+                                </ul>
+                            </nav>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-bell fa-3x text-muted mb-3"></i>
+                            <h5>No Notifications</h5>
+                            <p class="text-muted">You don't have any notifications at the moment.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Mark notifications as read when viewed
+    const notifications = document.querySelectorAll('.list-group-item');
+    notifications.forEach(notification => {
+        if (notification.classList.contains('list-group-item-primary')) {
+            // Here you would typically make an API call to mark the notification as read
+            // For now, we'll just remove the styling
+            notification.classList.remove('list-group-item-primary');
+        }
+    });
+});
+</script>
+{% endblock %}
+
+{% endblock %} 

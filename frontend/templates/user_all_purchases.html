@@ -343,6 +343,54 @@ margin-left: 10px;
 font-weight: 500;
 }
 
+.order-card {
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 25px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    padding: 20px;
+    transition: box-shadow 0.3s;
+}
+.order-card:hover {
+    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+}
+.order-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+.order-info {
+    display: flex;
+    flex-direction: column;
+}
+.order-id {
+    font-weight: bold;
+    color: #ff7b00;
+}
+.order-date, .order-status {
+    color: #888;
+    font-size: 0.95em;
+}
+.order-total {
+    font-size: 1.1em;
+    color: #162938;
+    font-weight: bold;
+}
+.order-items {
+    display: none;
+    margin-top: 20px;
+    border-top: 1px solid #eee;
+    padding-top: 15px;
+}
+.order-card.expanded .order-items {
+    display: block;
+}
+.order-items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 15px;
+}
 {% endblock %}
 
 {% block content %}
@@ -380,32 +428,51 @@ font-weight: 500;
             </form>
         </div>
 
-        {% if purchased_products %}
-            <div class="products-grid">
-                {% for product in purchased_products %}
-                    <div class="product-card">
-                        <div class="product-image">
-                            <img src="{{ product.image_url }}" alt="{{ product.product_name }}" onerror="this.src='/static/images/default-product.jpg'">
+        {% if orders %}
+            <div>
+                {% for order in orders %}
+                <div class="order-card" id="order-{{ order.order_id }}">
+                    <div class="order-summary" onclick="toggleOrder('{{ order.order_id }}')">
+                        <div class="order-info">
+                            <span class="order-id">Order #{{ order.order_id }}</span>
+                            <span class="order-date">{{ order.order_date }}</span>
+                            <span class="order-status">Status: {{ order.status }}</span>
                         </div>
-                        <div class="product-info">
-                            <h3>{{ product.product_name }}</h3>
-                            <p class="product-price">${{ "%.2f"|format(product.price) }} - <span class="product-status">{{ product.status }}</span></p>
-                            <p class="purchase-date">Purchased on: {{ product.purchase_date }}</p>
-                            <div class="purchase-details">
-                                <span>Qty: {{ product.quantity }}</span>
-                                <span>Total: ${{ "%.2f"|format(product.total_price) }}</span>
-                            </div>
-                            <div class="button-container">
-                                <a href="/product/{{ product.product_id }}" class="view-details">View Details</a>
-                                {% if not product.has_review %}
-                                <a href="/product/{{ product.product_id }}/review" class="write-review-btn">Write a Review</a>
-                                {% endif %}
-                            </div>
+                        <div class="order-total">
+                            Total: ${{ "%.2f"|format(order.total_amount) }}
+                        </div>
+                        <div>
+                            <span id="toggle-icon-{{ order.order_id }}">&#x25BC;</span>
                         </div>
                     </div>
+                    <div class="order-items">
+                        <div class="order-items-grid">
+                            {% for product in order['items'] %}
+                            <div class="product-card">
+                                <div class="product-image">
+                                    <img src="{{ product.image_url }}" alt="{{ product.product_name }}" onerror="this.src='/static/images/default-product.jpg'">
+                                </div>
+                                <div class="product-info">
+                                    <h3>{{ product.product_name }}</h3>
+                                    <p class="product-price">${{ "%.2f"|format(product.price) }}</p>
+                                    <div class="purchase-details">
+                                        <span>Qty: {{ product.quantity }}</span>
+                                        <span>Total: ${{ "%.2f"|format(product.total_price) }}</span>
+                                    </div>
+                                    <div class="button-container">
+                                        <a href="/product/{{ product.product_id }}" class="view-details">View Details</a>
+                                        {% if not product.has_review %}
+                                        <a href="/product/{{ product.product_id }}/review" class="write-review-btn">Write a Review</a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
                 {% endfor %}
             </div>
-
             <div class="pagination">
                 <button class="pagination-btn" {% if not has_prev %}disabled{% endif %} onclick="changePage({{ page - 1 }})">
                     Previous
@@ -493,6 +560,17 @@ function changePage(page) {
     const urlParams = new URLSearchParams(window.location.search);
     urlParams.set('page', page);
     window.location.search = urlParams.toString();
+}
+
+function toggleOrder(orderId) {
+    var card = document.getElementById('order-' + orderId);
+    card.classList.toggle('expanded');
+    var icon = document.getElementById('toggle-icon-' + orderId);
+    if (card.classList.contains('expanded')) {
+        icon.innerHTML = '&#x25B2;'; // up arrow
+    } else {
+        icon.innerHTML = '&#x25BC;'; // down arrow
+    }
 }
 </script>
 {% endblock %} 

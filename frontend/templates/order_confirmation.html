@@ -129,8 +129,8 @@
                 <div class="items-list">
                     {% for item in order['items'] %}
                     <div class="item">
-                        <span>{{ item['name'] }} (x{{ item['quantity'] }})</span>
-                        <span>${{ "%.2f"|format(item['price'] * item['quantity']) }}</span>
+                        <span>{{ item.name }} (x{{ item.quantity }})</span>
+                        <span>${{ "%.2f"|format(item.price * item.quantity) }}</span>
                     </div>
                     {% endfor %}
                 </div>
