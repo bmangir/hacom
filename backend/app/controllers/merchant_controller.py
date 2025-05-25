@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, session
 from . import login_required
-from ..services.service_locator import recommendation_service, tracking_service
+from ..services.service_locator import tracking_service, ITEM_RECOMMENDATION_SERVICE
 
 merchant_controller_blueprint = Blueprint('merchant_controller_blueprint', __name__)
 
@@ -9,7 +9,8 @@ merchant_controller_blueprint = Blueprint('merchant_controller_blueprint', __nam
 def merchant_details(merchant_id):
     try:
         # Get merchant details and their products
-        merchant = recommendation_service.get_merchant_details(merchant_id)
+        merchant = ITEM_RECOMMENDATION_SERVICE.get_merchant_details(merchant_id)
+        merchant = None
         if not merchant:
             return "Merchant not found", 404
             
