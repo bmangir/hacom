@@ -1,5 +1,4 @@
 import os
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 from pyspark.sql import Window, SparkSession
@@ -70,30 +69,72 @@ users_df = read_from_mongodb(
 
 products_df.cache()
 users_df.cache()
+# Trigger caching by forcing an action
+products_df.count()
+users_df.count()
 
 products_df = products_df.repartition(10)
 users_df = users_df.repartition(10)
+
+# Define UDFs
+similarity_feature_udf = find_similar_objects_udf(idx_host=ITEM_FEATURES_HOST, top_k=2)
+similarity_content_udf = find_similar_objects_udf(idx_host=ITEM_CONTENTS_HOST, top_k=2)
+similarity_user_udf = find_similar_objects_udf(idx_host=USER_FEATURES_HOST, top_k=2)
+
+# Filter products before finding similar items
+filtered_products = products_df.filter(
+    (col("trending_score") > 0.5) | 
+    (col("avg_rating") > 3.5)
+).select("product_id")
+
+# Group products into batches for batch processing
+product_batches = filtered_products.withColumn(
+    "batch_id",
+    pmod(monotonically_increasing_id(), lit(100))  # Create batches of 100
+).groupBy("batch_id").agg(
+    collect_list("product_id").alias("product_ids")
+)
+
+# Get similar items based on content vectors (metadata-content) using batch processing
+content_similar_items = product_batches.withColumn(
+    "similar_items_batch",
+    similarity_content_udf(col("product_ids"))
+).select(
+    explode(arrays_zip("product_ids", "similar_items_batch")).alias("similarity_pair")
+).select(
+    col("similarity_pair.product_ids").alias("product_id"),
+    col("similarity_pair.similar_items_batch").alias("content_similar_items")
+).cache()
+
+content_similar_items.count()
+print()
+
+# Get similar items based on feature vectors (behavioral)
+feature_similar_items = products_df.withColumn(
+    "feature_similar_items",
+    similarity_feature_udf(col("product_id"))
+).select("product_id", "feature_similar_items")
+feature_similar_items.cache()
+feature_similar_items.count()
+
+# Only process users with activity
+active_users = users_df.filter(
+    (size(col("browsing_behavior.freq_views.products")) > 0) | (col("browsing_behavior.freq_views.products") != "[]")
+    | (col("browsing_behavior.freq_views.products").isNotNull())
+).select("user_id")
+
+active_users = active_users.repartition(10)
+similar_users = active_users.withColumn(
+    "similar_users",
+    similarity_user_udf(col("user_id"))
+).cache()
+similar_users.count()
 
 
 def user_based_category_recommendations_all():
     """
     Optimized user-based collaborative filtering recommendations for categories based on top 3 most visited categories.
     """
-
-    client[MONGO_RECOMMENDATION_DB]["category_recommendations"].delete_many({})
-
-    similarity_udf = find_similar_objects_udf(idx_host=USER_FEATURES_HOST, top_k=10)
-
-    # Only process users with browsing behavior
-    active_users = users_df.filter(
-        size(col("browsing_behavior.freq_views.products")) > 0
-    ).select("user_id")
-
-    active_users = active_users.repartition(15)
-    similar_users = active_users.withColumn(
-        "similar_users",
-        similarity_udf(col("user_id"))
-    ).cache()
 
     # Take browsing categories and count them for each user
     user_categories = users_df.select(
@@ -140,7 +181,7 @@ def user_based_category_recommendations_all():
         "recc_at", unix_timestamp(current_timestamp()) * 1000
     )
 
-    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "category_recommendations", final_recommendations)
+    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "category_recommendations", final_recommendations, mode="overwrite")
 
     products_df.unpersist()
     users_df.unpersist()
@@ -155,21 +196,6 @@ def user_based_recommendations_all():
     Optimized user-based collaborative filtering recommendations
     People who behave like you also liked X
     """
-
-    client[MONGO_RECOMMENDATION_DB]["ubcf"].delete_many({})
-
-    similarity_udf = find_similar_objects_udf(idx_host=USER_FEATURES_HOST, top_k=5)
-
-    # Only process users with activity
-    active_users = users_df.filter(
-        size(col("browsing_behavior.freq_views.products")) > 0
-    ).select("user_id")
-
-    active_users = active_users.repartition(10)
-    similar_users = active_users.withColumn(
-        "similar_users",
-        similarity_udf(col("user_id"))
-    ).cache()
 
     # Get user items more efficiently - combine viewed and purchased
     user_items = users_df.select(
@@ -268,7 +294,7 @@ def user_based_recommendations_all():
         "recc_at"
     )
 
-    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "ubcf", final_recommendations)
+    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "ubcf", final_recommendations, mode="overwrite")
 
     products_df.unpersist()
     users_df.unpersist()
@@ -281,24 +307,6 @@ def item_based_recommendations_all():
     Customers who bought this also bought Y
     :return:
     """
-
-    client[MONGO_RECOMMENDATION_DB]["ibcf"].delete_many({})
-
-    # Find similar items based on item features and contents
-    similarity_feature_udf = find_similar_objects_udf(idx_host=ITEM_FEATURES_HOST, top_k=2)
-    similarity_content_udf = find_similar_objects_udf(idx_host=ITEM_CONTENTS_HOST, top_k=2)
-
-    # Get similar items based on feature vectors (behavioral)
-    feature_similar_items = products_df.withColumn(
-        "feature_similar_items",
-        similarity_feature_udf(col("product_id"))
-    ).select("product_id", "feature_similar_items")
-
-    # Get similar items based on content vectors (metadata-content)
-    content_similar_items = products_df.withColumn(
-        "content_similar_items",
-        similarity_content_udf(col("product_id"))
-    ).select("product_id", "content_similar_items")
 
     frequently_bought = products_df.select(
         "product_id",
@@ -384,26 +392,33 @@ def item_based_recommendations_all():
         unix_timestamp(current_timestamp()) * 1000
     )
 
-    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "ibcf", final_recommendations)
+    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "ibcf", final_recommendations, mode="overwrite")
 
 
 def content_based_recommendations_all():
     """
-    Since you liked sneakers, here are similar styles
-    :return:
+    Content-based recommendation combining feature-matching and product similarity
+    Optimized to reduce execution time and avoid task kills
     """
 
-    client[MONGO_RECOMMENDATION_DB]["content_based"].delete_many({})
+    # Select relevant user data and filter active users
+    active_users = users_df.filter(
+        size(col("browsing_behavior.freq_views.products")) > 0
+    ).select("user_id").cache()
 
-    # Get user preferences with available features
-    user_preferences = users_df.select(
+    user_preferences = users_df.join(
+        broadcast(active_users),
+        "user_id",
+        "inner"
+    ).select(
         "user_id",
         col("product_preferences.most_purchased_brands").alias("preferred_brands"),
         col("browsing_behavior.freq_views.categories").alias("browsed_categories"),
         col("price_sensitivity")
-    )
+    ).persist()
+    user_preferences.count()  # Trigger caching
 
-    # Get product metadata and features with available attributes
+    # Select product features and apply pre-filtering
     product_features = products_df.select(
         "product_id",
         "category",
@@ -413,113 +428,67 @@ def content_based_recommendations_all():
         "conversion_rate",
         col("latest_sales_summary.last_30_days_sales").alias("monthly_sales"),
         "seasonal_sales"
-    )
+    ).filter(
+        (col("trending_score") > 0.5) |
+        (col("avg_rating") > 4.0)
+    ).persist()
+    product_features.count()  # Trigger caching
 
-    # Find similar items based on content vectors using parallel processing
-    similarity_udf = find_similar_objects_udf(idx_host=ITEM_CONTENTS_HOST, top_k=15)
-    similar_items = products_df.withColumn(
-        "similar_items",
-        similarity_udf(col("product_id"))
-    )
-
-    # Calculate category affinity scores using actual browsing data
+    # Calculate category affinity scores
     category_affinity = user_preferences.select(
-        "user_id",
-        "browsed_categories"
+        "user_id", "browsed_categories"
     ).withColumn(
-        "category_scores",
-        explode("browsed_categories")
+        "category_scores", explode("browsed_categories")
     ).groupBy("user_id", "category_scores").count()
 
-    # Feature-based recommendations
-    feature_based_recommendations = user_preferences\
-        .crossJoin(product_features)\
-        .join(category_affinity, "user_id")\
-        .where(
-            (array_contains(col("preferred_brands"), col("brand"))) |
-            (col("category") == col("category_scores"))
-        )\
+    # Feature-based recommendations: match on category or brand (no crossJoin)
+    feature_based_recommendations = user_preferences.alias("u") \
+        .join(
+        product_features.alias("p"),
+        (array_contains(col("u.preferred_brands"), col("p.brand"))) |
+        (expr("array_contains(u.browsed_categories, p.category)"))
+    ) \
+        .join(broadcast(category_affinity), col("u.user_id") == category_affinity.user_id) \
         .select(
-            col("user_id").alias("feature_user_id"),
-            col("product_id").alias("feature_product_id"),
-            col("trending_score").alias("feature_trending_score"),
-            col("avg_rating").alias("feature_avg_rating"),
-            col("conversion_rate").alias("feature_conversion_rate"),
-            col("brand").alias("feature_brand"),
-            col("category").alias("feature_category"),
-            lit("feature_based").alias("feature_source")
-        )
+        col("u.user_id").alias("user_id"),
+        col("p.product_id").alias("product_id"),
+        col("p.trending_score").alias("trending_score"),
+        col("p.avg_rating").alias("avg_rating"),
+        col("p.conversion_rate").alias("conversion_rate"),
+        col("p.brand").alias("brand"),
+        col("p.category").alias("category"),
+        lit("feature_based").alias("source")
+    )
 
-    # Content-based recommendations (similar items approach)
-    content_based_recommendations = similar_items\
+    # Content-based recommendations: join similar items with product metadata
+    content_based_recommendations = content_similar_items \
         .select(
-            col("product_id").alias("content_product_id"),
-            explode("similar_items").alias("similar_product_id")
-        )\
-        .join(product_features, col("content_product_id") == product_features.product_id)\
+        col("product_id").alias("base_product"),
+        explode("content_similar_items").alias("product_id")
+    ) \
+        .join(product_features, "product_id") \
         .select(
-            col("similar_product_id").alias("content_product_id"),
-            col("trending_score").alias("content_trending_score"),
-            col("avg_rating").alias("content_avg_rating"),
-            col("conversion_rate").alias("content_conversion_rate"),
-            col("brand").alias("content_brand"),
-            col("category").alias("content_category"),
-            lit("content_similar").alias("content_source")
-        )\
-        .crossJoin(user_preferences.select(col("user_id").alias("content_user_id")))
+        "product_id",
+        "trending_score",
+        "avg_rating",
+        "conversion_rate",
+        "brand",
+        "category",
+        lit("content_similar").alias("source")
+    ) \
+        .join(broadcast(user_preferences.select("user_id")), "user_id")  # cross join yerine normal join
 
-    # Combine both approaches using join instead of union
-    recommendations = feature_based_recommendations\
-        .join(content_based_recommendations,
-              (feature_based_recommendations.feature_user_id == content_based_recommendations.content_user_id) &
-              (feature_based_recommendations.feature_product_id == content_based_recommendations.content_product_id),
-              "full")\
-        .select(
-            coalesce(
-                feature_based_recommendations.feature_user_id,
-                content_based_recommendations.content_user_id
-            ).alias("user_id"),
-            coalesce(
-                feature_based_recommendations.feature_product_id,
-                content_based_recommendations.content_product_id
-            ).alias("product_id"),
-            coalesce(
-                feature_based_recommendations.feature_trending_score,
-                content_based_recommendations.content_trending_score
-            ).alias("trending_score"),
-            coalesce(
-                feature_based_recommendations.feature_avg_rating,
-                content_based_recommendations.content_avg_rating
-            ).alias("avg_rating"),
-            coalesce(
-                feature_based_recommendations.feature_conversion_rate,
-                content_based_recommendations.content_conversion_rate
-            ).alias("conversion_rate"),
-            coalesce(
-                feature_based_recommendations.feature_brand,
-                content_based_recommendations.content_brand
-            ).alias("brand"),
-            coalesce(
-                feature_based_recommendations.feature_category,
-                content_based_recommendations.content_category
-            ).alias("category"),
-            coalesce(
-                feature_based_recommendations.feature_source,
-                content_based_recommendations.content_source
-            ).alias("source")
-        )
+    # Union both sets of recommendations
+    recommendations = feature_based_recommendations.unionByName(content_based_recommendations)
 
+    # Join user preferences again for final scoring
     recommendations = recommendations.join(
-        user_preferences.select(
-            "user_id",
-            "preferred_brands",
-            "browsed_categories"
-        ),
+        user_preferences.select("user_id", "preferred_brands", "browsed_categories"),
         "user_id",
         "left"
     )
 
-    # Calculate recommendation score based on available factors
+    # Calculate relevance and final score
     recommendations = recommendations.withColumn(
         "relevance_score",
         (when(array_contains(col("preferred_brands"), col("brand")), 1.0).otherwise(0.0) * 0.4) +
@@ -532,28 +501,36 @@ def content_based_recommendations_all():
         (col("conversion_rate") * 0.2)
     )
 
+    # Rank top 10 per user
     window_spec = Window.partitionBy("user_id").orderBy(desc("final_score"))
     final_recommendations = recommendations.withColumn(
-        "rank",
-        row_number().over(window_spec)
+        "rank", row_number().over(window_spec)
     ).filter(col("rank") <= 10).withColumn(
-        "recc_at",
-        unix_timestamp(current_timestamp()) * 1000
+        "recc_at", unix_timestamp(current_timestamp()) * 1000
     ).select(
         "user_id",
         col("product_id").alias("recc_item"),
         "final_score",
         "relevance_score",
-        lit("content_based").alias("source"),
+        "source",
         "recc_at"
     )
 
-    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "content_based", final_recommendations)
+    # Store to MongoDB
+    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "content_based", final_recommendations, mode="overwrite")
+
+    # Cleanup
+    active_users.unpersist()
+    user_preferences.unpersist()
+    product_features.unpersist()
+    category_affinity.unpersist()
+    feature_based_recommendations.unpersist()
+    content_based_recommendations.unpersist()
+    recommendations.unpersist()
+    final_recommendations.unpersist()
 
 
 def best_sellers_all():
-    client[MONGO_RECOMMENDATION_DB]["best_sellers"].delete_many({})
-
     best_selling_items = products_df\
         .select(
             "product_id",
@@ -568,12 +545,10 @@ def best_sellers_all():
         unix_timestamp(current_timestamp()) * 1000
     )
 
-    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "best_sellers", best_selling_items)
+    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "best_sellers", best_selling_items, mode="overwrite")
 
 
 def new_arrivals_all():
-    client[MONGO_RECOMMENDATION_DB]["new_arrivals"].delete_many({})
-
     new_items = products_df\
         .select(
             "product_id",
@@ -588,12 +563,10 @@ def new_arrivals_all():
         unix_timestamp(current_timestamp()) * 1000
     )
 
-    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "new_arrivals", new_items)
+    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "new_arrivals", new_items, mode="overwrite")
 
 
 def trending_products_all():
-    client[MONGO_RECOMMENDATION_DB]["trending_products"].delete_many({})
-
     trending_items = products_df\
         .select(
             "product_id",
@@ -603,12 +576,10 @@ def trending_products_all():
         )\
         .orderBy(desc("trending_score"))
 
-    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "trending_products", trending_items)
+    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "trending_products", trending_items, mode="overwrite")
 
 
 def seasonal_recommendations_all():
-    client[MONGO_RECOMMENDATION_DB]["seasonal"].delete_many({})
-
     # get current season
     current_month = datetime.now().month
 
@@ -634,12 +605,10 @@ def seasonal_recommendations_all():
         unix_timestamp(current_timestamp()) * 1000
     )
 
-    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "seasonal", seasonal_items)
+    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "seasonal", seasonal_items, mode="overwrite")
 
 
 def review_based_recommendations_all():
-    client[MONGO_RECOMMENDATION_DB]["review_based"].delete_many({})
-
     top_rated_items = products_df\
         .select(
             "product_id",
@@ -654,7 +623,7 @@ def review_based_recommendations_all():
         unix_timestamp(current_timestamp()) * 1000
     )
 
-    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "review_based", top_rated_items)
+    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "review_based", top_rated_items, mode="overwrite")
 
 
 def recently_viewed_based_recommendations():
@@ -662,8 +631,6 @@ def recently_viewed_based_recommendations():
     Get personalized recommendations based on user's recently viewed products and their view duration.
     If user_id is None, generate recommendations for all users.
     """
-
-    client[MONGO_RECOMMENDATION_DB]["recently_viewed_based"].delete_many({})
 
     # Get user's browsing behavior with view durations
     browsing_data = users_df.select(
@@ -693,19 +660,12 @@ def recently_viewed_based_recommendations():
         row_number().over(window_spec)
     ).filter(col("rank") <= 10)
 
-    # Find similar products for each viewed product
-    similarity_udf = find_similar_objects_udf(idx_host=ITEM_FEATURES_HOST, top_k=15)
-    similar_items = top_viewed_products.withColumn(
-        "similar_items",
-        similarity_udf(col("product_id"))
-    )
-
     # Get top 10 similar products for each viewed product
-    recommendations = similar_items.select(
+    recommendations = feature_similar_items.select(
         "user_id",
         "product_id",
         "view_duration",
-        explode("similar_items").alias("recommended_item")
+        explode("feature_similar_items").alias("recommended_item")
     ).groupBy("user_id", "recommended_item").agg(
         first("product_id").alias("source_product"),
         max("view_duration").alias("source_view_duration")
@@ -726,14 +686,12 @@ def recently_viewed_based_recommendations():
         "recc_at"
     )
 
-    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "recently_viewed_based", final_recommendations)
+    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "recently_viewed_based", final_recommendations, mode="overwrite")
 
 
 def personalized_trending_products():
     """Personalized trending products based on user preferences and current trends
     Uses pre-calculated features from MongoDB instead of computing them again."""
-
-    client[MONGO_RECOMMENDATION_DB]["personalized_trending"].delete_many({})
 
     trending_base = products_df.select(
         "product_id",
@@ -820,13 +778,14 @@ def personalized_trending_products():
         "recc_at"
     )
 
-    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "personalized_trending", final_recommendations)
+    store_df_to_mongodb(MONGO_RECOMMENDATION_DB, "personalized_trending", final_recommendations, mode="overwrite")
 
 
 def run_all_recommendations():
+    global users_df, products_df
+
     user_based_recommendations_all()
     item_based_recommendations_all()
-    content_based_recommendations_all()
     best_sellers_all()
     new_arrivals_all()
     trending_products_all()
@@ -835,9 +794,6 @@ def run_all_recommendations():
     recently_viewed_based_recommendations()
     personalized_trending_products()
     user_based_category_recommendations_all()
-
-print("Starting recommendation generation...")
-start = datetime.now()
-run_all_recommendations()
-end = datetime.now()
-print(f"Recommendations generated in {end - start} seconds.")
+    users_df = users_df.repartition("user_id")
+    products_df = products_df.repartition("category")
+    content_based_recommendations_all()
