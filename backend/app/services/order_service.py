@@ -2,10 +2,11 @@ import time
 from datetime import datetime
 import uuid
 
-from backend.config.config import MONGO_PRODUCTS_DB
+from backend.app.models.user_models import ProductDetails
+from backend.config import MONGO_PRODUCTS_DB, client
 from databases.mongo.mongo_connector import MongoConnector
 from databases.postgres.neon_postgres_connector import NeonPostgresConnector
-from databases.postgres.postgres_connector import PostgresConnector
+from backend.utils.utils import kafka_producer_util
 
 
 class OrderService:
@@ -21,6 +22,7 @@ class OrderService:
             order_id = f"O{str(uuid.uuid4().int)[:8]}"
             order_date = datetime.now()
             status = "Pending"
+            order_total = 0
 
             # Insert order items
             for item in cart_items:
@@ -37,6 +39,7 @@ class OrderService:
                 """
                 
                 total_amount = item['price'] * item['quantity']
+                order_total += total_amount
                 
                 params = (
                     order_id,
@@ -57,9 +60,52 @@ class OrderService:
                 )
                 
                 cursor.execute(query, params)
+                
+                # Send purchase event to Kafka for each product
+                purchase_details = {
+                    "user_id": user_id,
+                    "session_id": None,  # This would come from the controller
+                    "product_id": item['product_id'],
+                    "quantity": item['quantity'],
+                    "unit_price": item['price'],
+                    "total_amount": total_amount,
+                    "order_id": order_id,
+                    "payment_method": payment_method,
+                    "purchase_date": datetime.utcnow().strftime("%Y-%m-%d"),
+                    "status": status
+                }
+                
+                # Format and send the purchase event
+                purchase_event = kafka_producer_util.format_interaction_event(
+                    user_id=user_id,
+                    product_id=item['product_id'],
+                    event_type="purchase",
+                    details=purchase_details
+                )
+                #kafka_producer_util.send_event(purchase_event)
 
             # Commit the transaction
             conn.commit()
+            
+            # Send order completed event to Kafka
+            order_completed_details = {
+                "user_id": user_id,
+                "order_id": order_id,
+                "order_total": order_total,
+                "item_count": len(cart_items),
+                "payment_method": payment_method,
+                "shipping_info": {k: v for k, v in shipping_info.items() if k != 'email'},
+                "purchase_date": datetime.utcnow().strftime("%Y-%m-%d"),
+                "status": status
+            }
+            
+            order_event = kafka_producer_util.format_interaction_event(
+                user_id=user_id,
+                product_id=None,
+                event_type="order_completed",
+                details=order_completed_details
+            )
+            #kafka_producer_util.send_event(order_event)
 
             return {
                 'order_id': order_id,
@@ -67,7 +113,8 @@ class OrderService:
                 'order_date': order_date,
                 'items': cart_items,
                 'shipping_info': shipping_info,
-                'payment_method': payment_method
+                'payment_method': payment_method,
+                'total': order_total
             }
 
         except Exception as e:
@@ -89,14 +136,7 @@ class OrderService:
             conn = NeonPostgresConnector.get_connection()
             cursor = conn.cursor()
 
-            # Get MongoDB connection
-            mongo_conn = MongoConnector()
-            client = mongo_conn.get_client()
-            if not client:
-                print("MongoDB connection failed")
-                return None
-
-            products_coll = client[MONGO_PRODUCTS_DB]['products']
+            #products_coll = client[MONGO_PRODUCTS_DB]['products']
 
             # Get order details from PostgreSQL
             query = """
@@ -152,16 +192,15 @@ class OrderService:
                 unit_price = float(order[4])
                 
                 # Get product details from MongoDB
-                product = products_coll.find_one({'product_id': product_id})
-                product_name = product.get('product_name', 'Unknown Product') if product else 'Unknown Product'
-                
+                product = ProductDetails.objects(product_id=product_id).first()
+
                 # Calculate item total
                 item_total = unit_price * quantity
                 subtotal += item_total
                 
                 # Add item to order details
                 order_details['items'].append({
-                    'name': product_name,
+                    'name': product.product_name,
                     'product_id': product_id,
                     'quantity': quantity,
                     'price': unit_price,
@@ -194,16 +233,41 @@ class OrderService:
         try:
             conn = NeonPostgresConnector.get_connection()
             cursor = conn.cursor()
+            
+            # Get order info first to check if it is there
+            cursor.execute("SELECT user_id FROM orders WHERE order_id = %s LIMIT 1", [order_id])
+            result = cursor.fetchone()
+            if not result:
+                return False
+            
+            user_id = result[0]
 
             query = "UPDATE orders SET status = %s WHERE order_id = %s"
             cursor.execute(query, [new_status, order_id])
             conn.commit()
+            
+            # Send order status update event to Kafka
+            status_details = {
+                "user_id": user_id,
+                "order_id": order_id,
+                "new_status": new_status,
+                "update_date": datetime.utcnow().strftime("%Y-%m-%d")
+            }
+            
+            status_event = kafka_producer_util.format_interaction_event(
+                user_id=user_id,
+                product_id=None,
+                event_type="order_status_updated",
+                details=status_details
+            )
+            #kafka_producer_util.send_event(status_event)
 
             return True
+
         except Exception as e:
+            print(f"Error updating order status: {str(e)}")
             if conn:
                 conn.rollback()
-            print(f"Error updating order status: {str(e)}")
             return False
         finally:
             if cursor:
