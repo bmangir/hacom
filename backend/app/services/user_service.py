@@ -134,22 +134,23 @@ class UserService:
             total_orders = cursor.fetchone()[0]
 
             # Sorting
-            order_clause = "ORDER BY o.order_date DESC"
+            order_clause = "ORDER BY order_date DESC"
             if sort_by == 'price-high':
-                order_clause = "ORDER BY o.total_amount DESC"
+                order_clause = "ORDER BY total_amount DESC"
             elif sort_by == 'price-low':
-                order_clause = "ORDER BY o.total_amount ASC"
+                order_clause = "ORDER BY total_amount ASC"
             # (Sorting by name is not supported at order level)
 
             # Pagination
             limit_clause = "LIMIT %s OFFSET %s"
             params_with_pagination = params + [per_page, (page - 1) * per_page]
 
-            # Get orders for this page
+            # Get unique orders for this page, with correct total and summary
             orders_query = f"""
-                SELECT DISTINCT o.order_id, o.order_date, o.total_amount, o.status
+                SELECT o.order_id, MIN(o.order_date) as order_date, SUM(o.total_amount) as total_amount, MIN(o.status) as status
                 FROM orders o
                 {where_clause}
+                GROUP BY o.order_id
                 {order_clause}
                 {limit_clause}
             """
