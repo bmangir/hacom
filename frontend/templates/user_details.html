@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Profile Details{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <!-- Profile Overview -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-body text-center">
+                    <img src="{{ user.profile.profile_picture or url_for('static', filename='images/default-avatar.png') }}" 
+                         class="rounded-circle img-fluid mb-3" style="width: 150px; height: 150px; object-fit: cover;">
+                    <h4>{{ user.profile.first_name }} {{ user.profile.last_name }}</h4>
+                    <p class="text-muted mb-1">{{ user.profile.email }}</p>
+                    <p class="text-muted mb-3">Member since {{ user.profile.created_at }}</p>
+                    <div class="d-flex justify-content-center mb-2">
+                        <a href="{{ url_for('user_blueprint.settings') }}" class="btn btn-primary">Edit Profile</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Statistics</h5>
+                    <div class="row text-center">
+                        <div class="col-6 mb-3">
+                            <h6>Orders</h6>
+                            <h4>{{ user.statistics.total_orders }}</h4>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <h6>Reviews</h6>
+                            <h4>{{ user.statistics.total_reviews }}</h4>
+                        </div>
+                        <div class="col-6">
+                            <h6>Visits</h6>
+                            <h4>{{ user.statistics.total_visits }}</h4>
+                        </div>
+                        <div class="col-6">
+                            <h6>Total Spent</h6>
+                            <h4>${{ "%.2f"|format(user.statistics.total_spent) }}</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Details -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Profile Information</h5>
+                    <div class="row">
+                        <div class="col-sm-3">
+                            <p class="mb-0">Full Name</p>
+                        </div>
+                        <div class="col-sm-9">
+                            <p class="text-muted mb-0">{{ user.profile.first_name }} {{ user.profile.last_name }}</p>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-sm-3">
+                            <p class="mb-0">Email</p>
+                        </div>
+                        <div class="col-sm-9">
+                            <p class="text-muted mb-0">{{ user.profile.email }}</p>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-sm-3">
+                            <p class="mb-0">Phone</p>
+                        </div>
+                        <div class="col-sm-9">
+                            <p class="text-muted mb-0">{{ user.profile.phone_number or 'Not provided' }}</p>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-sm-3">
+                            <p class="mb-0">Gender</p>
+                        </div>
+                        <div class="col-sm-9">
+                            <p class="text-muted mb-0">{{ user.profile.gender|title or 'Not specified' }}</p>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-sm-3">
+                            <p class="mb-0">Birth Date</p>
+                        </div>
+                        <div class="col-sm-9">
+                            <p class="text-muted mb-0">{{ user.profile.birthdate or 'Not provided' }}</p>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-sm-3">
+                            <p class="mb-0">Address</p>
+                        </div>
+                        <div class="col-sm-9">
+                            <p class="text-muted mb-0">{{ user.profile.address or 'Not provided' }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Recent Activity</h5>
+                    {% if user.recent_activity %}
+                        <div class="list-group">
+                            {% for activity in user.recent_activity %}
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">
+                                            {% if activity.type == 'order' %}
+                                                <i class="fas fa-shopping-cart text-primary me-2"></i>
+                                                New Order
+                                            {% else %}
+                                                <i class="fas fa-star text-warning me-2"></i>
+                                                New Review
+                                            {% endif %}
+                                        </h6>
+                                        <small class="text-muted">{{ activity.date }}</small>
+                                    </div>
+                                    <p class="mb-1">
+                                        {% if activity.type == 'order' %}
+                                            Order total: ${{ "%.2f"|format(activity.amount) }}
+                                        {% else %}
+                                            Rating: {{ activity.amount }}/5
+                                        {% endif %}
+                                    </p>
+                                    <small class="text-muted">Product ID: {{ activity.product_id }}</small>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No recent activity</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

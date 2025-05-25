@@ -3,68 +3,902 @@
 {% block title %}Account Settings{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h1 class="mb-4">Account Settings</h1>
+<!-- Add custom CSS for decorative elements -->
+<style>
+.settings-container {
+    position: relative;
+    /* overflow: hidden; */
+}
 
-    <div class="row">
-        <!-- Settings Navigation -->
-        <div class="col-md-3">
-            <div class="list-group">
-                <a href="#profile" class="list-group-item list-group-item-action active" data-bs-toggle="list">
-                    <i class="fas fa-user me-2"></i>Profile
-                </a>
-                <a href="#security" class="list-group-item list-group-item-action" data-bs-toggle="list">
-                    <i class="fas fa-shield-alt me-2"></i>Security
-                </a>
-                <a href="#notifications" class="list-group-item list-group-item-action" data-bs-toggle="list">
-                    <i class="fas fa-bell me-2"></i>Notifications
-                </a>
-                <a href="#privacy" class="list-group-item list-group-item-action" data-bs-toggle="list">
-                    <i class="fas fa-lock me-2"></i>Privacy
-                </a>
-                <a href="#preferences" class="list-group-item list-group-item-action" data-bs-toggle="list">
-                    <i class="fas fa-cog me-2"></i>Preferences
-                </a>
+.decoration-shape {
+    position: absolute;
+    z-index: 0;
+    opacity: 0.1;
+}
+
+.shape-1 {
+    top: -50px;
+    right: -50px;
+    width: 200px;
+    height: 200px;
+    background: linear-gradient(45deg, #6366f1, #8b5cf6);
+    border-radius: 50%;
+}
+
+.shape-2 {
+    bottom: 20%;
+    right: 10%;
+    width: 150px;
+    height: 150px;
+    background: linear-gradient(135deg, #10b981, #3b82f6);
+    border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+}
+
+.shape-3 {
+    bottom: -50px;
+    right: 30%;
+    width: 180px;
+    height: 180px;
+    background: linear-gradient(225deg, #f59e0b, #ef4444);
+    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+}
+
+.card {
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.95);
+}
+
+.settings-nav .list-group-item {
+    border: none;
+    margin-bottom: 5px;
+    border-radius: 10px !important;
+    transition: all 0.3s ease;
+}
+
+.settings-nav .list-group-item:hover {
+    background-color: rgba(99, 102, 241, 0.1);
+    transform: translateX(5px);
+}
+
+.settings-nav .list-group-item.active {
+    background: linear-gradient(45deg, #6366f1, #8b5cf6);
+    border: none;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+.input-group {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.input-group-text {
+    background: linear-gradient(45deg, #f8fafc, #f1f5f9);
+    border: none;
+    color: #6366f1;
+}
+
+.form-control, .form-select {
+    border: none;
+    padding: 0.75rem 1rem;
+}
+
+.form-control:focus, .form-select:focus {
+    box-shadow: none;
+    border-color: #6366f1;
+}
+
+.btn-primary {
+    background: linear-gradient(45deg, #6366f1, #8b5cf6);
+    border: none;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.3);
+}
+
+.btn-outline-secondary {
+    border: 2px solid #e2e8f0;
+    color: #64748b;
+}
+
+.btn-outline-secondary:hover {
+    background-color: #f8fafc;
+    border-color: #cbd5e1;
+    color: #475569;
+}
+
+.profile-upload-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.profile-upload-wrapper::after {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    right: -10px;
+    bottom: -10px;
+    border: 2px dashed #e2e8f0;
+    border-radius: 50%;
+    animation: rotate 20s linear infinite;
+}
+
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Enhanced Header Styles */
+.settings-header {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    padding: 2rem 2rem 1rem 2rem;
+    border-radius: 0 0 20px 20px;
+    margin-bottom: 2rem;
+    width: 100%;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transition: box-shadow 0.3s, padding 0.3s, font-size 0.3s;
+}
+
+.settings-header.scrolled {
+    padding: 0.7rem 2rem 0.5rem 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+}
+
+.settings-header.scrolled h1 {
+    font-size: 1.3rem;
+    margin-bottom: 0.5rem;
+}
+
+.settings-header h1 {
+    color: white;
+    font-size: 2.2rem;
+    margin-bottom: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.settings-nav {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.settings-nav-link {
+    color: rgba(255, 255, 255, 0.8);
+    padding: 0.75rem 1.5rem;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.settings-nav-link:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.settings-nav-link.active {
+    background: white;
+    color: #6366f1;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.settings-nav-link::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    height: 2px;
+    background: currentColor;
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+}
+
+.settings-nav-link:hover::after,
+.settings-nav-link.active::after {
+    width: 80%;
+}
+
+.back-button {
+    background: white;
+    color: #6366f1;
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.back-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+    color: #4f46e5;
+}
+
+/* Enhanced Form Styles */
+.form-control, .form-select {
+    background-color: #f8fafc;
+    border: 2px solid #e2e8f0;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    color: #1e293b;
+    font-size: 1rem;
+}
+
+.form-control:focus, .form-select:focus {
+    background-color: white;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+}
+
+.input-group {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    border-radius: 12px;
+    background: white;
+    padding: 0.25rem;
+}
+
+.input-group-text {
+    background: #f8fafc;
+    border: none;
+    color: #6366f1;
+    padding: 0 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 3rem;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+/* Card Enhancements */
+.card {
+    background: white;
+    border: none;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    border-radius: 20px;
+}
+
+.card-body {
+    padding: 2rem;
+}
+
+.settings-nav .list-group-item {
+    padding: 1rem 1.5rem;
+    margin-bottom: 0.5rem;
+    border-radius: 12px !important;
+    font-weight: 500;
+    color: #475569;
+}
+
+/* Button Enhancements */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background: linear-gradient(45deg, #6366f1, #8b5cf6);
+    border: none;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.3);
+}
+
+.btn-outline-secondary {
+    border: 2px solid #e2e8f0;
+    color: #64748b;
+    background: white;
+}
+
+.btn-outline-secondary:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #475569;
+    transform: translateY(-2px);
+}
+
+/* Profile Picture Enhancement */
+.profile-upload-wrapper {
+    margin: 2rem 0;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.profile-picture-container {
+    position: relative;
+    width: 180px;
+    height: 180px;
+    margin: 0 auto;
+}
+
+.profile-picture {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 4px solid white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.camera-button {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: #6366f1;
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    transition: all 0.3s ease;
+}
+
+.camera-button:hover {
+    transform: scale(1.1);
+    background: #4f46e5;
+}
+
+.field-icon {
+    font-size: 1.2rem;
+    color: #6366f1;
+    margin-right: 10px;
+    width: 24px;
+    text-align: center;
+}
+
+.form-group {
+    margin-bottom: 2rem;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.form-group label {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: #64748b;
+    min-width: 200px;
+}
+
+.form-control-wrapper {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 1rem 1.5rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    background: #f8fafc;
+    transition: all 0.3s ease;
+    font-size: 1rem;
+    color: #1e293b;
+    text-align: center;
+}
+
+.form-control::placeholder {
+    color: #94a3b8;
+    opacity: 1;
+}
+
+.password-toggle {
+    background: none;
+    border: none;
+    padding: 0.5rem;
+    color: #94a3b8;
+    cursor: pointer;
+    transition: color 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+.password-toggle:hover {
+    color: #6366f1;
+}
+
+.btn-update {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: 12px;
+    border: none;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+    margin-top: 2rem;
+}
+
+.btn-update:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+.back-to-profile {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.75rem 1.5rem;
+    background: white;
+    color: #6366f1;
+    text-decoration: none;
+    border-radius: 12px;
+    margin-bottom: 2rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.back-to-profile:hover {
+    transform: translateX(-5px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+.back-to-profile i {
+    margin-right: 0.5rem;
+}
+
+.quick-nav {
+    background: white;
+    border-radius: 15px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.quick-nav-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #FF8C42;
+}
+
+.nav-pills {
+    display: flex;
+    gap: 0.5rem;
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+.nav-pills .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    color: #64748b;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.nav-pills .nav-link:hover {
+    background: rgba(99, 102, 241, 0.1);
+    color: #6366f1;
+}
+
+.nav-pills .nav-link.active {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+}
+
+.nav-pills .nav-link i {
+    font-size: 1.1rem;
+}
+
+.settings-layout {
+    display: flex;
+    gap: 30px;
+    margin: 0 auto;
+    padding: 20px;
+    position: relative;
+}
+
+.settings-main {
+    flex: 1;
+    min-width: 300px;
+}
+
+.settings-sidebar {
+    width: 250px;
+    position: sticky;
+    top: 270px; /* Adjusted to account for both headers */
+    height: fit-content;
+    flex-shrink: 0;
+}
+
+.profile-nav {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.profile-nav h2 {
+    color: #162938;
+    margin-bottom: 20px;
+    font-size: 1.5em;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #FF8C42;
+}
+
+.profile-nav-link {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    color: #162938;
+    background: #fff;
+    text-decoration: none;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    border: 1px solid #eee;
+    list-style: none;
+}
+
+.profile-nav-link:hover {
+    background: linear-gradient(135deg, #ff7b00, #ff3d00);
+    color: white;
+    transform: translateX(5px);
+    box-shadow: 0 4px 8px rgba(255, 61, 0, 0.2);
+}
+
+.profile-nav-link i {
+    margin-right: 10px;
+    font-size: 1.2em;
+    width: 24px;
+    text-align: center;
+}
+
+.profile-nav-link.active {
+    background: linear-gradient(135deg, #ff7b00, #ff3d00);
+    color: white;
+    box-shadow: 0 4px 8px rgba(255, 61, 0, 0.2);
+}
+
+.profile-nav-section {
+    margin-bottom: 20px;
+}
+
+.profile-nav-section-title {
+    color: #666;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    padding-left: 15px;
+}
+
+.nav-pills {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.tab-pane {
+    padding-top: 20px;
+    min-height: auto;
+    scroll-margin-top: 100px; /* Adjust based on header height */
+}
+
+.tab-pane:not(:first-child) {
+    margin-top: 40px;
+}
+
+.form-control-wrapper {
+    flex: 1;
+    position: relative;
+}
+
+.form-control-wrapper .btn-link {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    color: #6b7280;
+    transition: color 0.3s ease;
+}
+
+.form-control-wrapper .btn-link:hover {
+    color: #374151;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #475569;
+}
+
+.form-group small {
+    display: block;
+    margin-top: 0.25rem;
+    color: #6b7280;
+}
+
+.field-icon {
+    font-size: 1.2rem;
+    color: #6366f1;
+    margin-right: 10px;
+    width: 24px;
+    text-align: center;
+}
+
+.form-control {
+    background-color: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    padding-right: 3rem;
+    width: 100%;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    font-weight: 600;
+    color: white;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+/* Update security form styles to match profile section */
+#securityForm .form-group {
+    margin-bottom: 1.5rem;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+#securityForm .form-group label {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: #64748b;
+    min-width: 200px;
+}
+
+#securityForm .form-control-wrapper {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+#securityForm .form-control {
+    width: 100%;
+    padding: 1rem 1.5rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    background: #f8fafc;
+    transition: all 0.3s ease;
+    font-size: 1rem;
+    color: #1e293b;
+    text-align: left; /* Align text to left */
+}
+
+#securityForm .password-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+}
+
+#securityForm .btn-update {
+    margin-left: 0; /* Remove margin to align left */
+    margin-top: 2rem;
+}
+
+/* Add padding to tab content for better spacing */
+.tab-content {
+    padding-top: 2rem;
+}
+</style>
+
+<div class="container py-5 settings-container">
+    <!-- Decorative Shapes -->
+    <div class="decoration-shape shape-1"></div>
+    <div class="decoration-shape shape-2"></div>
+    <div class="decoration-shape shape-3"></div>
+
+    <!-- Back to Profile Link -->
+    <a href="{{ url_for('user_blueprint.profile') }}" class="back-to-profile">
+        <i class="fas fa-arrow-left"></i>
+        Back to Profile
+    </a>
+
+    <div class="settings-layout">
+        <div class="settings-main">
+            <!-- Settings Header with Navigation -->
+            <div class="settings-header">
+                <h1>
+                    <i class="fas fa-cog"></i>
+                    Account Settings
+                </h1>
+                
+                <div class="settings-nav">
+                    <a href="#profile" class="settings-nav-link active" data-bs-toggle="pill">
+                        <i class="fas fa-user"></i>
+                        Profile
+                    </a>
+                    <a href="#security" class="settings-nav-link" data-bs-toggle="pill">
+                        <i class="fas fa-shield-alt"></i>
+                        Security
+                    </a>
+                    <a href="#notifications" class="settings-nav-link" data-bs-toggle="pill">
+                        <i class="fas fa-bell"></i>
+                        Notifications
+                    </a>
+                    <a href="#privacy" class="settings-nav-link" data-bs-toggle="pill">
+                        <i class="fas fa-lock"></i>
+                        Privacy
+                    </a>
+                    <a href="#preferences" class="settings-nav-link" data-bs-toggle="pill">
+                        <i class="fas fa-sliders-h"></i>
+                        Preferences
+                    </a>
+                </div>
             </div>
-        </div>
 
-        <!-- Settings Content -->
-        <div class="col-md-9">
             <div class="tab-content">
-                <!-- Profile Settings -->
+                <!-- Profile Settings Tab -->
                 <div class="tab-pane fade show active" id="profile">
                     <div class="card">
                         <div class="card-body">
-                            <h5 class="card-title mb-4">Profile Information</h5>
-                            <form id="profileForm">
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <label for="firstName" class="form-label">First Name</label>
+                            <div class="profile-upload-wrapper text-center">
+                                <div class="profile-picture-container">
+                                    <img src="{{ settings.profile_picture or url_for('static', filename='images/default-avatar.png') }}"
+                                         class="profile-picture"
+                                         alt="Profile Picture">
+                                    <label for="profilePicture" class="camera-button">
+                                        <i class="fas fa-camera"></i>
+                                        <input type="file" id="profilePicture" name="profile_picture" 
+                                               class="d-none" accept="image/*">
+                                    </label>
+                                </div>
+                                <p class="text-muted mt-2">Click the camera icon to update your profile picture</p>
+                            </div>
+
+                            <form id="profileForm" class="needs-validation" novalidate>
+                                <div class="form-group">
+                                    <label>
+                                        <i class="fas fa-user field-icon"></i>
+                                        First Name
+                                    </label>
+                                    <div class="form-control-wrapper">
                                         <input type="text" class="form-control" id="firstName" name="first_name" 
-                                               value="{{ settings.first_name }}" required>
+                                               value="{{ settings.first_name }}" required
+                                               placeholder="Enter your first name">
                                     </div>
-                                    <div class="col-md-6">
-                                        <label for="lastName" class="form-label">Last Name</label>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>
+                                        <i class="fas fa-user field-icon"></i>
+                                        Last Name
+                                    </label>
+                                    <div class="form-control-wrapper">
                                         <input type="text" class="form-control" id="lastName" name="last_name" 
-                                               value="{{ settings.last_name }}" required>
+                                               value="{{ settings.last_name }}" required
+                                               placeholder="Enter your last name">
                                     </div>
                                 </div>
 
-                                <div class="mb-3">
-                                    <label for="email" class="form-label">Email</label>
-                                    <input type="email" class="form-control" id="email" name="email" 
-                                           value="{{ settings.email }}" required>
+                                <div class="form-group">
+                                    <label>
+                                        <i class="fas fa-envelope field-icon"></i>
+                                        Email Address
+                                    </label>
+                                    <div class="form-control-wrapper">
+                                        <input type="email" class="form-control" id="email" name="email" 
+                                               value="{{ settings.email }}" required
+                                               placeholder="Enter your email address">
+                                    </div>
                                 </div>
 
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <label for="phone" class="form-label">Phone Number</label>
+                                <div class="form-group">
+                                    <label>
+                                        <i class="fas fa-phone field-icon"></i>
+                                        Phone Number
+                                    </label>
+                                    <div class="form-control-wrapper">
                                         <input type="tel" class="form-control" id="phone" name="phone_number" 
-                                               value="{{ settings.phone_number }}">
+                                               value="{{ settings.phone_number }}"
+                                               placeholder="(123) 456-7890">
                                     </div>
-                                    <div class="col-md-6">
-                                        <label for="gender" class="form-label">Gender</label>
-                                        <select class="form-select" id="gender" name="gender">
+                                </div>
+
+                                <div class="form-group">
+                                    <label>
+                                        <i class="fas fa-venus-mars field-icon"></i>
+                                        Gender
+                                    </label>
+                                    <div class="form-control-wrapper">
+                                        <select class="form-control" id="gender" name="gender">
                                             <option value="">Select Gender</option>
                                             <option value="male" {% if settings.gender == 'male' %}selected{% endif %}>Male</option>
                                             <option value="female" {% if settings.gender == 'female' %}selected{% endif %}>Female</option>
@@ -73,150 +907,193 @@
                                     </div>
                                 </div>
 
-                                <div class="mb-3">
-                                    <label for="birthdate" class="form-label">Birth Date</label>
-                                    <input type="date" class="form-control" id="birthdate" name="birthdate" 
-                                           value="{{ settings.birthdate }}">
+                                <div class="form-group">
+                                    <label>
+                                        <i class="fas fa-calendar field-icon"></i>
+                                        Birth Date
+                                    </label>
+                                    <div class="form-control-wrapper">
+                                        <input type="date" class="form-control" id="birthdate" name="birthdate" 
+                                               value="{{ settings.birthdate }}">
+                                    </div>
                                 </div>
 
-                                <div class="mb-3">
-                                    <label for="address" class="form-label">Address</label>
-                                    <textarea class="form-control" id="address" name="address" rows="3">{{ settings.address }}</textarea>
+                                <div class="form-group">
+                                    <label>
+                                        <i class="fas fa-map-marker-alt field-icon"></i>
+                                        Address
+                                    </label>
+                                    <div class="form-control-wrapper">
+                                        <textarea class="form-control" id="address" name="address" rows="3" 
+                                                  placeholder="Enter your full address">{{ settings.address }}</textarea>
+                                    </div>
                                 </div>
 
-                                <div class="mb-3">
-                                    <label for="profilePicture" class="form-label">Profile Picture</label>
-                                    <input type="file" class="form-control" id="profilePicture" name="profile_picture" accept="image/*">
+                                <div class="d-flex justify-content-between align-items-center mt-4">
+                                    <button type="reset" class="btn btn-outline-secondary">
+                                        <i class="fas fa-undo me-2"></i>Reset
+                                    </button>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Save Changes
+                                    </button>
                                 </div>
-
-                                <button type="submit" class="btn btn-primary">Save Changes</button>
                             </form>
                         </div>
                     </div>
                 </div>
 
-                <!-- Security Settings -->
+                <!-- Security Settings Tab -->
                 <div class="tab-pane fade" id="security">
                     <div class="card">
                         <div class="card-body">
-                            <h5 class="card-title mb-4">Security Settings</h5>
-                            <form id="securityForm">
-                                <div class="mb-3">
-                                    <label for="currentPassword" class="form-label">Current Password</label>
-                                    <input type="password" class="form-control" id="currentPassword" required>
+                            <div class="d-flex align-items-center mb-4">
+                                <i class="fas fa-shield-alt text-primary me-3" style="font-size: 2rem;"></i>
+                                <h3 class="mb-0">Security Settings</h3>
+                            </div>
+
+                            <form id="securityForm" class="needs-validation" novalidate>
+                                <div class="form-group">
+                                    <label>
+                                        <i class="fas fa-lock field-icon"></i>
+                                        Current Password
+                                    </label>
+                                    <div class="form-control-wrapper">
+                                        <input type="password" class="form-control" id="currentPassword" 
+                                               placeholder="Please enter your current password" required>
+                                        <button type="button" class="password-toggle" onclick="togglePassword('currentPassword')">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
                                 </div>
-                                <div class="mb-3">
-                                    <label for="newPassword" class="form-label">New Password</label>
-                                    <input type="password" class="form-control" id="newPassword" required>
+
+                                <div class="form-group">
+                                    <label>
+                                        <i class="fas fa-key field-icon"></i>
+                                        New Password
+                                    </label>
+                                    <div class="form-control-wrapper">
+                                        <input type="password" class="form-control" id="newPassword" 
+                                               placeholder="Please enter a new password" required>
+                                        <button type="button" class="password-toggle" onclick="togglePassword('newPassword')">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
                                 </div>
-                                <div class="mb-3">
-                                    <label for="confirmPassword" class="form-label">Confirm New Password</label>
-                                    <input type="password" class="form-control" id="confirmPassword" required>
+
+                                <div class="form-group">
+                                    <label>
+                                        <i class="fas fa-key field-icon"></i>
+                                        Confirm New Password
+                                    </label>
+                                    <div class="form-control-wrapper">
+                                        <input type="password" class="form-control" id="confirmPassword" 
+                                               placeholder="Please confirm your new password" required>
+                                        <button type="button" class="password-toggle" onclick="togglePassword('confirmPassword')">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
                                 </div>
-                                <button type="submit" class="btn btn-primary">Update Password</button>
+
+                                <button type="submit" class="btn-update">
+                                    <i class="fas fa-save"></i>
+                                    Update Password
+                                </button>
                             </form>
                         </div>
                     </div>
                 </div>
 
-                <!-- Notification Settings -->
+                <!-- Notifications Tab -->
                 <div class="tab-pane fade" id="notifications">
                     <div class="card">
                         <div class="card-body">
-                            <h5 class="card-title mb-4">Notification Preferences</h5>
-                            <form id="notificationForm">
-                                <div class="mb-3">
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="emailNotifications" 
-                                               {% if settings.notification_preferences.email %}checked{% endif %}>
-                                        <label class="form-check-label" for="emailNotifications">Email Notifications</label>
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="orderUpdates" 
-                                               {% if settings.notification_preferences.order_updates %}checked{% endif %}>
-                                        <label class="form-check-label" for="orderUpdates">Order Updates</label>
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="promotionalEmails" 
-                                               {% if settings.notification_preferences.promotional %}checked{% endif %}>
-                                        <label class="form-check-label" for="promotionalEmails">Promotional Emails</label>
-                                    </div>
-                                </div>
-                                <button type="submit" class="btn btn-primary">Save Preferences</button>
-                            </form>
+                            <h3>Notifications Settings</h3>
+                            <!-- Add notifications content -->
                         </div>
                     </div>
                 </div>
 
-                <!-- Privacy Settings -->
+                <!-- Privacy Tab -->
                 <div class="tab-pane fade" id="privacy">
                     <div class="card">
                         <div class="card-body">
-                            <h5 class="card-title mb-4">Privacy Settings</h5>
-                            <form id="privacyForm">
-                                <div class="mb-3">
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="profileVisibility" 
-                                               {% if settings.privacy_settings.profile_visible %}checked{% endif %}>
-                                        <label class="form-check-label" for="profileVisibility">Public Profile</label>
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="showEmail" 
-                                               {% if settings.privacy_settings.show_email %}checked{% endif %}>
-                                        <label class="form-check-label" for="showEmail">Show Email Address</label>
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="showOrders" 
-                                               {% if settings.privacy_settings.show_orders %}checked{% endif %}>
-                                        <label class="form-check-label" for="showOrders">Show Order History</label>
-                                    </div>
-                                </div>
-                                <button type="submit" class="btn btn-primary">Save Privacy Settings</button>
-                            </form>
+                            <h3>Privacy Settings</h3>
+                            <!-- Add privacy content -->
                         </div>
                     </div>
                 </div>
 
-                <!-- Preferences -->
+                <!-- Preferences Tab -->
                 <div class="tab-pane fade" id="preferences">
                     <div class="card">
                         <div class="card-body">
-                            <h5 class="card-title mb-4">Preferences</h5>
-                            <form id="preferencesForm">
-                                <div class="mb-3">
-                                    <label for="language" class="form-label">Language</label>
-                                    <select class="form-select" id="language" name="language_preference">
-                                        <option value="en" {% if settings.language_preference == 'en' %}selected{% endif %}>English</option>
-                                        <option value="tr" {% if settings.language_preference == 'tr' %}selected{% endif %}>Turkish</option>
-                                    </select>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="currency" class="form-label">Currency</label>
-                                    <select class="form-select" id="currency" name="currency_preference">
-                                        <option value="USD" {% if settings.currency_preference == 'USD' %}selected{% endif %}>USD ($)</option>
-                                        <option value="EUR" {% if settings.currency_preference == 'EUR' %}selected{% endif %}>EUR (€)</option>
-                                        <option value="TRY" {% if settings.currency_preference == 'TRY' %}selected{% endif %}>TRY (₺)</option>
-                                    </select>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="timezone" class="form-label">Timezone</label>
-                                    <select class="form-select" id="timezone" name="timezone">
-                                        <option value="UTC" {% if settings.timezone == 'UTC' %}selected{% endif %}>UTC</option>
-                                        <option value="Europe/Istanbul" {% if settings.timezone == 'Europe/Istanbul' %}selected{% endif %}>Istanbul (UTC+3)</option>
-                                    </select>
-                                </div>
-                                <button type="submit" class="btn btn-primary">Save Preferences</button>
-                            </form>
+                            <h3>Preferences Settings</h3>
+                            <!-- Add preferences content -->
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Navigation from user_profile.html -->
+        <div class="settings-sidebar">
+            <div class="profile-nav">
+                <h2>Quick Navigation</h2>
+                
+                <div class="profile-nav-section">
+                    <div class="profile-nav-section-title">Shopping</div>
+                    <a href="/all-visits" class="profile-nav-link {% if active_page == 'visits' %}active{% endif %}">
+                        <i class="fas fa-history"></i>
+                        Products I've Visited
+                    </a>
+                    <a href="/my-purchases" class="profile-nav-link {% if active_page == 'purchases' %}active{% endif %}">
+                        <i class="fas fa-shopping-bag"></i>
+                        My Purchases
+                    </a>
+                    <a href="/wishlist" class="profile-nav-link {% if active_page == 'wishlist' %}active{% endif %}">
+                        <i class="fas fa-heart"></i>
+                        My Wishlist
+                    </a>
+                </div>
+
+                <div class="profile-nav-section">
+                    <div class="profile-nav-section-title">Account</div>
+                    <a href="/my-profile" class="profile-nav-link {% if active_page == 'profile' %}active{% endif %}">
+                        <i class="fas fa-user"></i>
+                        My Profile
+                    </a>
+                    <a href="/my-profile/details" class="profile-nav-link {% if active_page == 'details' %}active{% endif %}">
+                        <i class="fas fa-id-card"></i>
+                        Profile Details
+                    </a>
+                    <a href="/my-profile/details/my-addresses" class="profile-nav-link {% if active_page == 'addresses' %}active{% endif %}">
+                        <i class="fas fa-map-marker-alt"></i>
+                        My Addresses
+                    </a>
+                </div>
+
+                <div class="profile-nav-section">
+                    <div class="profile-nav-section-title">Reviews & Feedback</div>
+                    <a href="/my-reviews" class="profile-nav-link {% if active_page == 'reviews' %}active{% endif %}">
+                        <i class="fas fa-star"></i>
+                        My Reviews
+                    </a>
+                    <a href="/my-comments" class="profile-nav-link {% if active_page == 'comments' %}active{% endif %}">
+                        <i class="fas fa-comments"></i>
+                        My Comments
+                    </a>
+                </div>
+
+                <div class="profile-nav-section">
+                    <div class="profile-nav-section-title">Settings</div>
+                    <a href="/my-profile/settings" class="profile-nav-link {% if active_page == 'settings' %}active{% endif %}">
+                        <i class="fas fa-cog"></i>
+                        Account Settings
+                    </a>
+                    <a href="/my-profile/notifications" class="profile-nav-link {% if active_page == 'notifications' %}active{% endif %}">
+                        <i class="fas fa-bell"></i>
+                        Notifications
+                    </a>
                 </div>
             </div>
         </div>
@@ -226,41 +1103,97 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Handle form submissions
-    const forms = ['profileForm', 'securityForm', 'notificationForm', 'privacyForm', 'preferencesForm'];
+    const header = document.querySelector('.settings-header');
+    const navLinks = document.querySelectorAll('.settings-nav-link');
+    const sections = document.querySelectorAll('.tab-pane');
     
-    forms.forEach(formId => {
-        const form = document.getElementById(formId);
-        if (form) {
-            form.addEventListener('submit', async function(e) {
-                e.preventDefault();
-                
-                const formData = new FormData(form);
-                const data = {};
-                formData.forEach((value, key) => data[key] = value);
-                
-                try {
-                    const response = await fetch('/my-profile/settings', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(data)
-                    });
-                    
-                    const result = await response.json();
-                    
-                    if (result.success) {
-                        alert('Settings updated successfully!');
-                    } else {
-                        alert('Error: ' + result.message);
-                    }
-                } catch (error) {
-                    alert('Error updating settings: ' + error.message);
+    // Function to get the current active section
+    function getCurrentSection() {
+        let current = '';
+        const scrollPosition = window.scrollY + 100; // Add small offset for better detection
+        
+        sections.forEach(section => {
+            const sectionTop = section.offsetTop;
+            const sectionHeight = section.offsetHeight;
+            
+            if (scrollPosition >= sectionTop && scrollPosition < sectionTop + sectionHeight) {
+                current = section.getAttribute('id');
+            }
+        });
+        
+        return current;
+    }
+    
+    // Handle scroll
+    window.addEventListener('scroll', () => {
+        // Shrink header on scroll
+        if (window.scrollY > 10) {
+            header.classList.add('scrolled');
+        } else {
+            header.classList.remove('scrolled');
+        }
+        // Update active section
+        const currentSection = getCurrentSection();
+        if (currentSection) {
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === `#${currentSection}`) {
+                    link.classList.add('active');
                 }
             });
         }
     });
+
+    // Handle navigation link clicks
+    navLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('href').substring(1);
+            const targetSection = document.getElementById(targetId);
+            
+            window.scrollTo({
+                top: targetSection.offsetTop - 100,
+                behavior: 'smooth'
+            });
+            
+            navLinks.forEach(l => l.classList.remove('active'));
+            this.classList.add('active');
+        });
+    });
+
+    // Initial check for active section
+    window.dispatchEvent(new Event('scroll'));
+
+    // Handle password toggle
+    window.togglePassword = function(inputId) {
+        const input = document.getElementById(inputId);
+        const icon = input.nextElementSibling.querySelector('i');
+        
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
+
+    // Profile picture preview
+    const profilePicture = document.getElementById('profilePicture');
+    if (profilePicture) {
+        profilePicture.addEventListener('change', function(e) {
+            if (e.target.files && e.target.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.querySelector('.profile-picture');
+                    img.src = e.target.result;
+                }
+                reader.readAsDataURL(e.target.files[0]);
+            }
+        });
+    }
 });
 </script>
 {% endblock %}

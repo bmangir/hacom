@@ -3,7 +3,7 @@ import math
 
 from . import login_required
 from ..services.auth_service import AuthService
-from ..services.service_locator import tracking_service, session_service, user_service, USER_RECOMMENDATION_SERVICE
+from ..services.service_locator import tracking_service, session_service, user_service, USER_RECOMMENDATION_SERVICE, ITEM_RECOMMENDATION_SERVICE
 
 user_blueprint = Blueprint('user_blueprint', __name__)
 
@@ -220,45 +220,47 @@ def all_purchases():
     page = request.args.get('page', 1, type=int)
     date_range = request.args.get('date_range', 'all')
     sort_by = request.args.get('sort_by', 'recent')
-    per_page = 12  # Number of products per page
+    per_page = 12  # Number of orders per page
 
     try:
-        # Get purchased products with filters
-        purchased_products = user_service.get_purchased_products(
+        # Get purchased orders with filters
+        result = user_service.get_purchased_products(
             user_id=user_id,
             date_range=date_range,
             sort_by=sort_by,
             page=page,
             per_page=per_page
         )
-
-        # Get pagination info
-        total_pages = (purchased_products['total'] + per_page - 1) // per_page
+        orders = result.get('orders', [])
+        total_orders = result.get('total', 0)
+        total_pages = (total_orders + per_page - 1) // per_page
 
         has_prev = page > 1
         has_next = page < total_pages
 
         return render_template(
             "user_all_purchases.html",
-            purchased_products=purchased_products.get('products', []),
+            orders=orders,
             page=page,
             total_pages=total_pages,
             has_prev=has_prev,
             has_next=has_next,
             date_range=date_range,
-            sort_by=sort_by
+            sort_by=sort_by,
+            active_page='purchases'
         )
     except Exception as e:
         print(f"Error loading purchase history: {str(e)}")
         return render_template(
             "user_all_purchases.html",
-            purchased_products=[],
+            orders=[],
             page=1,
             total_pages=1,
             has_prev=False,
             has_next=False,
             date_range='all',
-            sort_by='recent'
+            sort_by='recent',
+            active_page='purchases'
         )
 
 
@@ -315,6 +317,9 @@ def my_reviews():
             per_page=per_page
         )
 
+        # Get recommended items based on reviews
+        recommended_items = ITEM_RECOMMENDATION_SERVICE.get_reviewed_based_items()
+
         # Get pagination info
         total_pages = (reviews['total'] + per_page - 1) // per_page
 
@@ -329,7 +334,8 @@ def my_reviews():
             has_prev=has_prev,
             has_next=has_next,
             date_range=date_range,
-            sort_by=sort_by
+            sort_by=sort_by,
+            recommended_items=recommended_items
         )
     except Exception as e:
         print(f"Error loading reviews: {str(e)}")
@@ -341,7 +347,8 @@ def my_reviews():
             has_prev=False,
             has_next=False,
             date_range='all',
-            sort_by='recent'
+            sort_by='recent',
+            recommended_items=[]
         )
 
 
@@ -386,3 +393,58 @@ def settings():
     except Exception as e:
         print(f"Error loading settings: {str(e)}")
         return render_template("user_settings.html", settings={})
+
+
+@user_blueprint.route("/my-profile/details")
+@login_required
+def profile_details():
+    user_id = session.get('user_id')
+    
+    try:
+        # Get user details
+        user_details = user_service.get_user_details(user_id)
+        return render_template("user_details.html", user=user_details)
+    except Exception as e:
+        print(f"Error loading user details: {str(e)}")
+        return render_template("user_details.html", user={})
+
+
+@user_blueprint.route("/my-profile/notifications")
+@login_required
+def notifications():
+    user_id = session.get('user_id')
+    page = request.args.get('page', 1, type=int)
+    per_page = 10  # Number of notifications per page
+
+    try:
+        # Get user notifications
+        #notifications = user_service.get_user_notifications(
+        #    user_id=user_id,
+        #    page=page,
+        #    per_page=per_page
+        #)
+        notifications = {"notifications": [], "total": 0}
+
+        # Get pagination info
+        total_pages = (notifications['total'] + per_page - 1) // per_page
+        has_prev = page > 1
+        has_next = page < total_pages
+
+        return render_template(
+            "user_notifications.html",
+            notifications=notifications.get('notifications', []),
+            page=page,
+            total_pages=total_pages,
+            has_prev=has_prev,
+            has_next=has_next
+        )
+    except Exception as e:
+        print(f"Error loading notifications: {str(e)}")
+        return render_template(
+            "user_notifications.html",
+            notifications=[],
+            page=1,
+            total_pages=1,
+            has_prev=False,
+            has_next=False
+        )

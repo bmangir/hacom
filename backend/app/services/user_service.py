@@ -106,25 +106,18 @@ class UserService:
             return []
 
     def get_purchased_products(self, user_id, date_range='all', sort_by='recent', page=1, per_page=12):
-        """Get purchased products with filtering and pagination."""
+        """Get purchased products grouped by order, with filtering and pagination."""
         conn = None
         cursor = None
         try:
-            # Connect to PostgreSQL for orders
             conn = NeonPostgresConnector.get_connection()
             cursor = conn.cursor()
 
-            # Base query parts
-            select_clause = """
-                SELECT o.order_id, o.product_id, o.quantity, o.order_date, o.total_amount,
-                       r.review_id, status
-                FROM orders o   
-                LEFT JOIN product_reviews r ON o.product_id = r.product_id AND o.user_id = r.user_id
-            """
+            # Base query: get all orders for the user (with filters)
             where_clause = "WHERE o.user_id = %s"
             params = [user_id]
 
-            # Apply date range filter
+            # Date filter
             if date_range != 'all':
                 date_filter = {
                     'today': datetime.now().replace(hour=0, minute=0, second=0, microsecond=0),
@@ -135,61 +128,67 @@ class UserService:
                     where_clause += " AND o.order_date >= %s"
                     params.append(date_filter[date_range])
 
-            # Apply sorting
-            order_clause = ""
-            if sort_by == 'recent':
-                order_clause = "ORDER BY o.order_date DESC"
-            elif sort_by == 'price-high':
+            # Count total orders for pagination
+            count_query = f"SELECT COUNT(DISTINCT o.order_id) FROM orders o {where_clause}"
+            cursor.execute(count_query, params)
+            total_orders = cursor.fetchone()[0]
+
+            # Sorting
+            order_clause = "ORDER BY o.order_date DESC"
+            if sort_by == 'price-high':
                 order_clause = "ORDER BY o.total_amount DESC"
             elif sort_by == 'price-low':
                 order_clause = "ORDER BY o.total_amount ASC"
-            elif sort_by == 'name':
-                order_clause = "ORDER BY o.product_id"  # We'll sort by name after getting product details
+            # (Sorting by name is not supported at order level)
 
-            # Add pagination
+            # Pagination
             limit_clause = "LIMIT %s OFFSET %s"
-            params.extend([per_page, (page - 1) * per_page])
+            params_with_pagination = params + [per_page, (page - 1) * per_page]
 
-            # Combine query
-            query = f"{select_clause} {where_clause} {order_clause} {limit_clause}"
-            
-            # Execute query
-            cursor.execute(query, params)
+            # Get orders for this page
+            orders_query = f"""
+                SELECT DISTINCT o.order_id, o.order_date, o.total_amount, o.status
+                FROM orders o
+                {where_clause}
+                {order_clause}
+                {limit_clause}
+            """
+            cursor.execute(orders_query, params_with_pagination)
             orders = cursor.fetchall()
 
-            #products_collection = client[MONGO_PRODUCTS_DB]['products']
-            
-            # Combine order and product information
-            products = []
-            for order in orders:
-                order_id, product_id, quantity, order_date, total_amount, review_id, status = order
+            order_list = []
+            for order_id, order_date, total_amount, status in orders:
+                # Get all items for this order
+                items_query = """
+                    SELECT o.product_id, o.quantity, o.total_amount, r.review_id
+                    FROM orders o
+                    LEFT JOIN product_reviews r ON o.product_id = r.product_id AND o.user_id = r.user_id
+                    WHERE o.order_id = %s
+                """
+                cursor.execute(items_query, [order_id])
+                items = cursor.fetchall()
+                product_items = []
+                for product_id, quantity, item_total, review_id in items:
+                    product = ProductDetails.objects(product_id=product_id).first()
+                    if product:
+                        product_data = product.to_mongo().to_dict()
+                        product_data['quantity'] = quantity
+                        product_data['total_price'] = float(item_total)
+                        product_data['has_review'] = review_id is not None
+                        product_items.append(product_data)
+                order_list.append({
+                    'order_id': order_id,
+                    'order_date': time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(order_date / 1000)),
+                    'total_amount': float(total_amount),
+                    'status': status,
+                    'items': product_items
+                })
 
-                # Get product details from MongoDB
-                product = ProductDetails.objects(product_id=product_id).first()
-                if product:
-                    # Add order details to product info
-                    product_data = product.to_mongo().to_dict()
-                    product_data['purchase_date'] = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(order_date / 1000))
-                    product_data['quantity'] = quantity
-                    product_data['total_price'] = float(total_amount)
-                    product_data['has_review'] = review_id is not None
-                    product_data['status'] = status
-                    products.append(product_data)
-
-            # Apply name sorting if needed
-            if sort_by == 'name':
-                products.sort(key=lambda x: x.get('product_name', ''))
-
-            # Get total count for pagination
-            count_query = f"SELECT COUNT(DISTINCT order_id) FROM orders o {where_clause}"
-            cursor.execute(count_query, [user_id])
-            total_count = cursor.fetchone()[0]
-
-            return {'products': products, 'total': total_count}
+            return {'orders': order_list, 'total': total_orders}
 
         except Exception as e:
             print(f"Error getting purchased products: {str(e)}")
-            return {'products': [], 'total': 0}
+            return {'orders': [], 'total': 0}
         finally:
             if cursor:
                 cursor.close()
@@ -357,7 +356,7 @@ class UserService:
 
             # Base query parts
             select_clause = """
-                SELECT r.review_id, r.product_id, r.rating, r.comment, r.review_date,
+                SELECT r.review_id, r.product_id, r.rating, r.review_text, r.review_date,
                        o.order_id, o.quantity, o.total_amount
                 FROM product_reviews r
                 LEFT JOIN orders o ON r.product_id = o.product_id AND r.user_id = o.user_id
@@ -434,7 +433,7 @@ class UserService:
                 NeonPostgresConnector.return_connection(conn)
 
     def get_user_settings(self, user_id):
-        """Get all user settings and preferences."""
+        """Get user settings (profile fields only, matching get_user_details)."""
         conn = None
         cursor = None
         try:
@@ -442,12 +441,9 @@ class UserService:
             conn = NeonPostgresConnector.get_connection()
             cursor = conn.cursor()
 
-            # Get user profile information
+            # Get user profile information (matching get_user_details)
             profile_query = """
-                SELECT u.email, u.first_name, u.last_name, u.gender, u.birthdate, u.address,
-                       u.phone_number, u.profile_picture, u.created_at,
-                       u.notification_preferences, u.privacy_settings, u.language_preference,
-                       u.currency_preference, u.timezone
+                SELECT u.email, u.first_name, u.last_name, u.gender, u.birthdate, u.address, u.join_date
                 FROM users u
                 WHERE u.user_id = %s
             """
@@ -465,14 +461,7 @@ class UserService:
                 'gender': profile[3],
                 'birthdate': profile[4].strftime('%Y-%m-%d') if profile[4] else None,
                 'address': profile[5],
-                'phone_number': profile[6],
-                'profile_picture': profile[7],
-                'created_at': profile[8].strftime('%Y-%m-%d %H:%M:%S') if profile[8] else None,
-                'notification_preferences': profile[9] or {},
-                'privacy_settings': profile[10] or {},
-                'language_preference': profile[11] or 'en',
-                'currency_preference': profile[12] or 'USD',
-                'timezone': profile[13] or 'UTC'
+                'join_date': profile[6].strftime('%Y-%m-%d %H:%M:%S') if profile[6] else None
             }
 
             return settings
@@ -487,7 +476,7 @@ class UserService:
                 NeonPostgresConnector.return_connection(conn)
 
     def update_user_settings(self, user_id, data):
-        """Update user settings and preferences."""
+        """Update user settings (profile fields only, matching get_user_details)."""
         conn = None
         cursor = None
         try:
@@ -513,7 +502,7 @@ class UserService:
             if cursor.fetchone():
                 return None, "Email is already taken"
 
-            # Update user profile
+            # Update user profile (only allowed fields)
             update_query = """
                 UPDATE users
                 SET email = %s,
@@ -522,17 +511,10 @@ class UserService:
                     gender = %s,
                     birthdate = %s,
                     address = %s,
-                    phone_number = %s,
-                    notification_preferences = %s,
-                    privacy_settings = %s,
-                    language_preference = %s,
-                    currency_preference = %s,
-                    timezone = %s,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE user_id = %s
                 RETURNING user_id
             """
-            
             cursor.execute(update_query, [
                 data['email'],
                 data['first_name'],
@@ -540,23 +522,8 @@ class UserService:
                 data.get('gender'),
                 data.get('birthdate'),
                 data.get('address'),
-                data.get('phone_number'),
-                json.dumps(data.get('notification_preferences', {})),
-                json.dumps(data.get('privacy_settings', {})),
-                data.get('language_preference', 'en'),
-                data.get('currency_preference', 'USD'),
-                data.get('timezone', 'UTC'),
                 user_id
             ])
-
-            # Handle profile picture update if provided
-            if 'profile_picture' in data and data['profile_picture']:
-                # Here you would typically handle file upload and storage
-                # For now, we'll just update the URL
-                cursor.execute(
-                    "UPDATE users SET profile_picture = %s WHERE user_id = %s",
-                    [data['profile_picture'], user_id]
-                )
 
             conn.commit()
             return True, None
@@ -566,6 +533,174 @@ class UserService:
                 conn.rollback()
             print(f"Error updating user settings: {str(e)}")
             return None, str(e)
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                NeonPostgresConnector.return_connection(conn)
+
+
+    def get_user_details(self, user_id):
+        """Get detailed user information including statistics."""
+        conn = None
+        cursor = None
+        try:
+            # Connect to PostgreSQL
+            conn = NeonPostgresConnector.get_connection()
+            cursor = conn.cursor()
+
+            # Get user profile information
+            #profile_query = """
+            #    SELECT u.email, u.first_name, u.last_name, u.gender, u.birthdate, u.address,
+            #           u.phone_number, u.profile_picture, u.created_at,
+            #           u.notification_preferences, u.privacy_settings, u.language_preference,
+            #           u.currency_preference, u.timezone
+            #    FROM users u
+            #    WHERE u.user_id = %s
+            #"""
+            profile_query = """
+                SELECT u.email, u.first_name, u.last_name, u.gender, u.birthdate, u.address, u.join_date
+                FROM users u
+                WHERE u.user_id = %s
+            """
+            cursor.execute(profile_query, [user_id])
+            profile = cursor.fetchone()
+
+            if not profile:
+                return {}
+
+            # Get user statistics
+            stats_query = """
+                SELECT 
+                    (SELECT COUNT(*) FROM orders WHERE user_id = %s) as total_orders,
+                    (SELECT COUNT(*) FROM product_reviews WHERE user_id = %s) as total_reviews,
+                    (SELECT COUNT(*) FROM browsing_history WHERE user_id = %s) as total_visits,
+                    (SELECT SUM(total_amount) FROM orders WHERE user_id = %s) as total_spent
+            """
+            cursor.execute(stats_query, [user_id, user_id, user_id, user_id])
+            stats = cursor.fetchone()
+
+            # Get recent activity
+            activity_query = """
+                SELECT 
+                    'order' as type,
+                    order_date as date,
+                    product_id,
+                    total_amount as amount
+                FROM orders 
+                WHERE user_id = %s
+                UNION ALL
+                SELECT 
+                    'review' as type,
+                    review_date as date,
+                    product_id,
+                    rating as amount
+                FROM product_reviews 
+                WHERE user_id = %s
+                ORDER BY date DESC
+                LIMIT 5
+            """
+            cursor.execute(activity_query, [user_id, user_id])
+            recent_activity = cursor.fetchall()
+
+            # Convert profile data to dictionary
+            user_details = {
+                'profile': {
+                    'email': profile[0],
+                    'first_name': profile[1],
+                    'last_name': profile[2],
+                    'gender': profile[3],
+                    'birthdate': profile[4].strftime('%Y-%m-%d') if profile[4] else None,
+                    'address': profile[5],
+                    #'phone_number': profile[6],
+                    #'profile_picture': profile[7],
+                    'created_at': profile[6].strftime('%Y-%m-%d %H:%M:%S') if profile[6] else None,
+                    #'notification_preferences': profile[9] or {},
+                    #'privacy_settings': profile[10] or {},
+                    #'language_preference': profile[11] or 'en',
+                    #'currency_preference': profile[12] or 'USD',
+                    #'timezone': profile[13] or 'UTC'
+                },
+                'statistics': {
+                    'total_orders': stats[0] or 0,
+                    'total_reviews': stats[1] or 0,
+                    'total_visits': stats[2] or 0,
+                    'total_spent': float(stats[3]) if stats[3] else 0
+                },
+                'recent_activity': [
+                    {
+                        'type': activity[0],
+                        'date': activity[1].strftime('%Y-%m-%d %H:%M:%S'),
+                        'product_id': activity[2],
+                        'amount': float(activity[3]) if activity[0] == 'order' else int(activity[3])
+                    }
+                    for activity in recent_activity
+                ]
+            }
+
+            return user_details
+
+        except Exception as e:
+            print(f"Error getting user details: {str(e)}")
+            return {}
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                NeonPostgresConnector.return_connection(conn)
+
+    def get_user_notifications(self, user_id, page=1, per_page=10):
+        """Get user notifications with pagination."""
+        conn = None
+        cursor = None
+        try:
+            # Connect to PostgreSQL
+            conn = NeonPostgresConnector.get_connection()
+            cursor = conn.cursor()
+
+            # Get notifications
+            notifications_query = """
+                SELECT 
+                    notification_id,
+                    type,
+                    message,
+                    created_at,
+                    is_read,
+                    related_id
+                FROM notifications
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s
+            """
+            cursor.execute(notifications_query, [user_id, per_page, (page - 1) * per_page])
+            notifications = cursor.fetchall()
+
+            # Get total count
+            count_query = "SELECT COUNT(*) FROM notifications WHERE user_id = %s"
+            cursor.execute(count_query, [user_id])
+            total = cursor.fetchone()[0]
+
+            # Convert notifications to list of dictionaries
+            notification_list = [
+                {
+                    'id': n[0],
+                    'type': n[1],
+                    'message': n[2],
+                    'created_at': n[3].strftime('%Y-%m-%d %H:%M:%S'),
+                    'is_read': n[4],
+                    'related_id': n[5]
+                }
+                for n in notifications
+            ]
+
+            return {
+                'notifications': notification_list,
+                'total': total
+            }
+
+        except Exception as e:
+            print(f"Error getting user notifications: {str(e)}")
+            return {'notifications': [], 'total': 0}
         finally:
             if cursor:
                 cursor.close()
