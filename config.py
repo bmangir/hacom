@@ -4,12 +4,6 @@ import certifi
 from dotenv import load_dotenv
 from pymongo import MongoClient
 
-import nltk
-from nltk.sentiment import SentimentIntensityAnalyzer
-from sentence_transformers import SentenceTransformer
-from sklearn.preprocessing import MinMaxScaler
-from transformers import BertTokenizer, BertModel
-
 load_dotenv()
 
 MONGO_URI = os.getenv("MONGO_URI")
@@ -46,12 +40,3 @@ NEW_PINECONE_API = os.getenv("NEW_PINECONE_API")
 NEW_USER_FEATURES_HOST = os.getenv("NEW_USER_FEATURES_HOST")
 NEW_ITEM_FEATURES_HOST = os.getenv("NEW_ITEM_FEATURES_HOST")
 NEW_ITEM_CONTENTS_HOST = os.getenv("NEW_ITEM_CONTENTS_HOST")
-
-nltk.download("vader_lexicon")
-
-sia = SentimentIntensityAnalyzer()
-sentence_transformer_model = SentenceTransformer("all-MiniLM-L6-v2")
-scaler = MinMaxScaler()
-
-tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-bert_model = BertModel.from_pretrained('bert-base-uncased')
