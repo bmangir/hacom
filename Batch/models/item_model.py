@@ -2,8 +2,8 @@ from pyspark.sql import SparkSession
 from pyspark.sql.dataframe import DataFrame
 
 from config import MONGO_AGG_DATA_DB
-from utilities.spark_utility import extract_data, read_from_hdfs, store_to_hdfs, store_df_to_mongodb
-from utilities.pinecone_utility import store_to_pinecone
+from spark_utility import extract_data, read_from_hdfs, store_to_hdfs, store_df_to_mongodb
+from pinecone_utility import store_to_pinecone
 
 
 def fetch_data(spark: SparkSession):
