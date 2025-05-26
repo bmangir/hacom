@@ -7,7 +7,7 @@ import threading
 MAX_BYTES = 4 * 1024 * 1024  # 4MB
 SAFETY_MARGIN = 0.9  # Use 90% of limit to avoid edge overflow
 
-# Connection pool for Pinecone
+
 class PineconeConnectionPool:
     _instance = None
     _connections = {}
@@ -26,12 +26,15 @@ class PineconeConnectionPool:
                 self._connections[host] = Pinecone(api_key=PINECONE_API_KEY).Index(host=host, pool_threads=10)
             return self._connections[host]
 
+
 # Create a global connection pool instance
 connection_pool = PineconeConnectionPool()
+
 
 def get_vector_size_bytes(vector_dict):
     """Rough estimate of payload size when serialized to JSON."""
     return len(json.dumps(vector_dict).encode("utf-8"))
+
 
 def store_to_pinecone(vectors_df: DataFrame, host, batch_size=400):
     def func(iterable):
@@ -74,7 +77,8 @@ def store_to_pinecone(vectors_df: DataFrame, host, batch_size=400):
         print(e)
         print()
 
-def find_similar_objects(id, idx_host, top_k=5):
+
+def find_similar_objects(id, idx_host, top_k=2):
     try:
         # Get connection from pool
         index = connection_pool.get_connection(idx_host)
