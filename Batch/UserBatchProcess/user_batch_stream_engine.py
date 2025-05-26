@@ -1,31 +1,50 @@
 import time
 from datetime import datetime, timedelta
+import traceback
 
 from pyspark.sql import Window
 from pyspark.sql.functions import *
 from pyspark.sql.types import FloatType
 
-from Batch.UserBatchProcess import user_utility
-from Batch.models import user_model as UserModel
-from utilities.spark_utility import create_spark_session
+import user_utility
+import user_model as UserModel
+from spark_utility import create_spark_session
 
 user_feature_ext_sj = create_spark_session(app_name="user-features-extraction-job")
 
 
 class UserBatchService:
     def __init__(self):
-        (self.users_df,
-         self.orders_df,
-         self.reviews_df,
-         self.cart_df,
-         self.wishlist_df,
-         self.browsing_df,
-         self.clickstream_df,
-         self.session_df,
-         self.products_df,
-         self.users_ids_df, _) = UserModel.fetch_data(spark=user_feature_ext_sj)
-
-        self.preprocess_data()
+        try:
+            print("\nInitializing UserBatchService...")
+            print("Creating Spark session...")
+            self.spark = user_feature_ext_sj
+            
+            print("Extracting data...")
+            result = UserModel.fetch_data(spark=self.spark)
+            
+            if result is None:
+                raise Exception("Failed to fetch data - fetch_data returned None")
+            
+            (self.users_df,
+             self.orders_df,
+             self.reviews_df,
+             self.cart_df,
+             self.wishlist_df,
+             self.browsing_df,
+             self.clickstream_df,
+             self.session_df,
+             self.products_df,
+             self.users_ids_df, _) = result
+            
+            print("Data extraction successful")
+            print("Starting data preprocessing...")
+            self.preprocess_data()
+            print("Data preprocessing complete")
+            
+        except Exception as e:
+            print(f"\nError initializing UserBatchService: {str(e)}")
+            raise
 
     def preprocess_data(self):
         extract_place_name_udf = udf(user_utility.extract_place_name, StringType())
@@ -617,7 +636,7 @@ class UserBatchService:
             .join(category_exploration_df, "user_id", "left") \
             .join(brand_loyalty_df, "user_id", "left")
         
-        distributed_df = user_utility.distribution_of_df_by_range(transformed_df, 1)
+        distributed_df = user_utility.distribution_of_df_by_range(transformed_df, 15)
         return distributed_df
 
     def vectorize(self, agg_df: DataFrame) -> DataFrame:
@@ -647,10 +666,10 @@ class UserBatchService:
         distributed_df = self.define_user_features().cache()
         
         print("💾 Storing aggregated data to MongoDB...")
-        UserModel.store_agg_data_to_mongodb(distributed_df.drop("user_num", "user_range"))
+        UserModel.store_agg_data_to_mongodb(distributed_df.repartition(20).drop("user_num", "user_range"))
         
         print("🔄 Starting vectorization process...")
-        self.start_vectorization(distributed_df)
+        self.start_vectorization(distributed_df.repartition(20))
         
         print("✨ User Batch Process completed!")
         print("="*50)

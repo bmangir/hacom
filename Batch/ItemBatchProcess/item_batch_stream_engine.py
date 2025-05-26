@@ -7,28 +7,44 @@ from pyspark.sql.functions import *
 from pyspark.sql.types import FloatType, MapType, Row
 
 from config import MONGO_PRODUCTS_DB, client, NEW_ITEM_FEATURES_HOST as ITEM_FEATURES_HOST, NEW_ITEM_CONTENTS_HOST as ITEM_CONTENTS_HOST
-from Batch.models import item_model as ItemModel
-from Batch.ItemBatchProcess import item_utility
-from utilities.spark_utility import create_spark_session
+import item_model as ItemModel
+import item_utility
+from spark_utility import create_spark_session
 
 
 class ItemBatchService:
 
     def __init__(self):
-        self.item_feature_ext_sj = create_spark_session(app_name="item-features-extraction-job", num_of_partition="20")
+        try:
+            print("\nInitializing UserBatchService...")
+            print("Creating Spark session...")
+            self.item_feature_ext_sj = create_spark_session(app_name="item-features-extraction-job")
 
-        (self.users_df,
-         self.orders_df,
-         self.reviews_df,
-         self.cart_df,
-         self.wishlist_df,
-         self.browsing_df,
-         self.clickstream_df,
-         self.session_df,
-         self.products_df,
-         _, self.product_ids_df) = ItemModel.fetch_data(spark=self.item_feature_ext_sj)
+            print("Extracting data...")
+            result = ItemModel.fetch_data(spark=self.item_feature_ext_sj)
 
-        self.preprocess_data()
+            if result is None:
+                raise Exception("Failed to fetch data - fetch_data returned None")
+
+            (self.users_df,
+             self.orders_df,
+             self.reviews_df,
+             self.cart_df,
+             self.wishlist_df,
+             self.browsing_df,
+             self.clickstream_df,
+             self.session_df,
+             self.products_df,
+             _, self.product_ids_df) = result
+
+            print("Data extraction successful")
+            print("Starting data preprocessing...")
+            self.preprocess_data()
+            print("Data preprocessing complete")
+
+        except Exception as e:
+            print(f"\nError initializing UserBatchService: {str(e)}")
+            raise
 
     def preprocess_data(self):
         sentiment_udf = udf(item_utility.analyze_sentiment, FloatType())
@@ -657,7 +673,7 @@ class ItemBatchService:
 
         item_content_df = self.define_item_contents(basic_item_information, content_df)
         item_content_df = item_content_df.withColumn("agg_time", (unix_timestamp(current_timestamp()) * 1000))
-        distributed_content_df = item_utility.distribution_of_df_by_range(item_content_df, range=1)
+        distributed_content_df = item_utility.distribution_of_df_by_range(item_content_df, range=15)
 
         top_n_products_by_cat = top_n_products_by_cat.withColumn("agg_time", (unix_timestamp(current_timestamp()) * 1000))
 
@@ -674,7 +690,7 @@ class ItemBatchService:
             .join(customer_satisfaction_score_df, "product_id", "left") \
             .withColumn("agg_time", (unix_timestamp(current_timestamp()) * 1000))
 
-        distributed_features_df = item_utility.distribution_of_df_by_range(transformed_features_df, range=1)
+        distributed_features_df = item_utility.distribution_of_df_by_range(transformed_features_df, range=15)
 
         return distributed_content_df, top_n_products_by_cat, distributed_features_df
 
@@ -725,16 +741,16 @@ class ItemBatchService:
         distributed_content_df, top_products_based_cat_df, distributed_features_df = self.define_item_profile()
 
         print("💾 Storing top products by category...")
-        ItemModel.store_agg_data_to_mongodb(top_products_based_cat_df, "top_n_products_by_category")
+        ItemModel.store_agg_data_to_mongodb(top_products_based_cat_df.repartition(20), "top_n_products_by_category")
         
         print("💾 Storing item contents...")
-        ItemModel.store_agg_data_to_mongodb(distributed_content_df.drop("product_num", "product_range", "metadata"), "item_contents")
+        ItemModel.store_agg_data_to_mongodb(distributed_content_df.repartition(20).drop("product_num", "product_range", "metadata"), "item_contents")
         
         print("💾 Storing item features...")
-        ItemModel.store_agg_data_to_mongodb(distributed_features_df.drop("product_num", "product_range", "metadata"), "item_features")
+        ItemModel.store_agg_data_to_mongodb(distributed_features_df.repartition(20).drop("product_num", "product_range", "metadata"), "item_features")
 
         print("🔄 Starting vectorization process...")
-        self.start_vectorization(distributed_features_df, distributed_content_df)
+        self.start_vectorization(distributed_features_df.repartition(20), distributed_content_df.repartition(20))
 
         print("✨ Item Batch Process completed!")
         print("="*50)
