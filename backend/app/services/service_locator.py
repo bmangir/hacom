@@ -6,7 +6,7 @@ from backend.app.services.user_recommendation_service import UserRecommendationS
 from backend.app.services.tracking_service import TrackingService
 from backend.app.services.user_service import UserService
 from backend.app.services.wishlist_service import WishlistService
-from app.cache.redis_cache import RecommendationCache
+from backend.redis_app.cache.redis_cache import RecommendationCache
 from backend.config import MONGO_RECOMMENDATION_DB, client
 
 # Initialize Redis cache
