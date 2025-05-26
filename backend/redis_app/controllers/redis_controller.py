@@ -1,9 +1,9 @@
 from flask import Blueprint, jsonify
 from backend.app.services.service_locator import redis_cache
 
-main_controller_blueprint = Blueprint('main_controller', __name__)
+redis_main_controller_blueprint = Blueprint('redis_main_controller', __name__)
 
-@main_controller_blueprint.route('/api/clear-cache', methods=['POST'])
+@redis_main_controller_blueprint.route('/api/clear-cache', methods=['POST'])
 def clear_cache():
     """Clear all recommendation cache"""
     try:
