@@ -2,9 +2,15 @@ import os
 
 import certifi
 from dotenv import load_dotenv
+from mongoengine import ConnectionFailure
 from pymongo import MongoClient
+from pymongo.errors import ServerSelectionTimeoutError
 
-load_dotenv()
+# Try to load .env from /tmp first (for Dataproc), then from current directory
+if os.path.exists('/tmp/.env'):
+    load_dotenv('/tmp/.env')
+else:
+    load_dotenv()
 
 MONGO_URI = os.getenv("MONGO_URI")
 MONGO_PRODUCTS_DB=os.getenv("MONGO_PRODUCTS_DB")
@@ -30,10 +36,19 @@ CONFLUENT_API_SECRET = os.getenv("CONFLUENT_API_SECRET")
 CONFLUENT_INTERACTION_TOPIC = os.getenv("CONFLUENT_INTERACTION_TOPIC")
 CONFLUENT_CLIENT_ID = os.getenv("CONFLUENT_CLIENT_ID")
 
-client = MongoClient(MONGO_URI,
-                     serverSelectionTimeoutMS=5000,
-                     tlsCAFile=certifi.where(),
-                     maxPoolSize=200)
+# Define MongoDB client
+try:
+    client = MongoClient(MONGO_URI,
+                         serverSelectionTimeoutMS=5000,
+                         tlsCAFile=certifi.where(),
+                         maxPoolSize=200)
+    print("Mongo client is created successfully")
+except ConnectionFailure as e:
+    print(f"Connection failed: {e}")
+except ServerSelectionTimeoutError as e:
+    print(f"Server selection timed out: {e}")
+except Exception as e:
+    print(f"An unexpected error occurred: {e}")
 
 
 NEW_PINECONE_API = os.getenv("NEW_PINECONE_API")
