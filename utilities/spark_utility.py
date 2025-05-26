@@ -3,6 +3,7 @@ import os
 import traceback
 from _decimal import Decimal
 from datetime import datetime
+import subprocess
 
 from pymongo import errors
 from pyspark import Row
@@ -12,11 +13,15 @@ from pyspark.sql.dataframe import DataFrame
 import inspect
 
 from config import MONGO_URI, client, MONGO_LOGS_DB, MONGO_PRODUCTS_DB, MONGO_BROWSING_DB, JDBC_URL, NEON_DB_USER, \
-    NEON_DB_PASSWORD, CONFLUENT_BOOTSTRAP_SERVERS
+    NEON_DB_PASSWORD
+
+# Set transformers cache directory to GCS
+os.environ['TRANSFORMERS_CACHE'] = 'gs://my-spark-bucket-mangir/models'
+os.environ['SENTENCE_TRANSFORMERS_HOME'] = 'gs://my-spark-bucket-mangir/models'
 
 os.environ['PYSPARK_SUBMIT_ARGS'] = (
-    "--packages org.apache.spark:spark-streaming-kafka-0-10_2.12:3.2.0,"
-    "org.apache.spark:spark-sql-kafka-0-10_2.12:3.2.0,"
+    "--packages org.apache.spark:spark-streaming-kafka-0-10_2.12:3.5.0,"
+    "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,"
     "org.postgresql:postgresql:42.6.0,"
     "org.mongodb.spark:mongo-spark-connector_2.12:10.3.0 "
     "pyspark-shell"
@@ -27,36 +32,48 @@ collection = db["logs"]
 
 def create_spark_session(app_name, spark=None, num_of_partition="100"):
     if spark is None:
+        # Define all required jars including MongoDB dependencies
+        jars = [
+            "gs://my-spark-bucket-mangir/jars/mongo-spark-connector_2.12-10.3.0.jar",
+            "gs://my-spark-bucket-mangir/jars/spark-streaming-kafka-0-10_2.12-3.5.0.jar",
+            "gs://my-spark-bucket-mangir/jars/spark-sql-kafka-0-10_2.12-3.5.0.jar",
+            "gs://my-spark-bucket-mangir/jars/postgresql-42.6.0.jar",
+            "gs://my-spark-bucket-mangir/jars/bson-4.11.1.jar",
+            "gs://my-spark-bucket-mangir/jars/mongodb-driver-core-4.11.1.jar",
+            "gs://my-spark-bucket-mangir/jars/mongodb-driver-sync-4.11.1.jar"
+        ]
+        jars_path = ",".join(jars)
+        
         spark = SparkSession.builder.appName(app_name) \
-            .master("local[*]") \
             .config("spark.mongodb.read.connection.uri", MONGO_URI) \
             .config("spark.mongodb.write.connection.uri", MONGO_URI) \
-            .config("spark.jars.packages",
-                    "org.postgresql:postgresql:42.6.0,"
-                    "org.mongodb.spark:mongo-spark-connector_2.12:10.1.1,"
-                    "org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.0,"
-                    "org.apache.kafka:kafka-clients:2.8.0") \
             .config("spark.mongodb.input.partitioner", "MongoSamplePartitioner") \
             .config("spark.mongodb.input.partitionerOptions.samplesPerPartition", "1000") \
-            .config("spark.logConf", "true") \
-            .config("spark.logLevel", "WARN") \
-            .config("spark.sql.shuffle.partitions", num_of_partition) \
-            .config("spark.default.parallelism", "100") \
-            .config("spark.driver.memory", "8g") \
-            .config("spark.executor.memory", "8g") \
-            .config("spark.executor.cores", "8") \
-            .config("spark.executor.instances", "2") \
-            .config("spark.network.timeout", "600s") \
-            .config("spark.rdd.compress", "true") \
-            .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
+            .config("spark.sql.extensions", "com.mongodb.spark.sql.connector.MongoSparkConnector") \
+            .config("spark.jars", jars_path) \
+            .config("spark.memory.fraction", "0.8") \
+            .config("spark.memory.storageFraction", "0.3") \
+            .config("spark.sql.shuffle.partitions", "10") \
+            .config("spark.default.parallelism", "10") \
+            .config("spark.sql.adaptive.enabled", "true") \
+            .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
+            .config("spark.sql.adaptive.skewJoin.enabled", "true") \
+            .config("spark.sql.adaptive.localShuffleReader.enabled", "true") \
+            .config("spark.shuffle.service.enabled", "true") \
             .config("spark.dynamicAllocation.enabled", "true") \
-            .config("spark.dynamicAllocation.minExecutors", "2") \
-            .config("spark.dynamicAllocation.maxExecutors", "50") \
-            .config("spark.dynamicAllocation.initialExecutors", "10") \
-            .config("spark.task.maxFailures", "10") \
-            .config("spark.speculation", "true") \
-            .config("spark.kafka.bootstrap.servers", CONFLUENT_BOOTSTRAP_SERVERS) \
-            .config("spark.kafka.consumer.cache.capacity", "256") \
+            .config("spark.dynamicAllocation.minExecutors", "1") \
+            .config("spark.dynamicAllocation.maxExecutors", "2") \
+            .config("spark.dynamicAllocation.executorIdleTimeout", "30s") \
+            .config("spark.dynamicAllocation.schedulerBacklogTimeout", "15s") \
+            .config("spark.cleaner.periodicGC.interval", "1min") \
+            .config("spark.memory.offHeap.enabled", "true") \
+            .config("spark.memory.offHeap.size", "512m") \
+            .config("spark.cleaner.referenceTracking.cleanCheckpoints", "true") \
+            .config("spark.sql.shuffle.partitions.maxParallelism", "10") \
+            .config("spark.sql.autoBroadcastJoinThreshold", "5m") \
+            .config("spark.sql.broadcastTimeout", "300") \
+            .config("spark.network.timeout", "420s") \
+            .config("spark.executor.heartbeatInterval", "30s") \
             .getOrCreate()
 
     return spark
@@ -69,15 +86,21 @@ def read_from_mongodb(spark, db_name, coll_name, filter={}):
     # Create pipeline with filter
     pipeline = [{"$match": filter}]
 
-    df = spark.read \
-        .format("mongodb") \
-        .option("spark.mongodb.read.connection.uri", MONGO_URI) \
-        .option("database", db_name) \
-        .option("collection", coll_name) \
-        .option("pipeline", json.dumps(pipeline)) \
-        .load()
-
-    return df
+    try:
+        df = spark.read \
+            .format("mongodb") \
+            .option("connection.uri", MONGO_URI) \
+            .option("database", db_name) \
+            .option("collection", coll_name) \
+            .option("pipeline", json.dumps(pipeline)) \
+            .load()
+        
+        print(f"Successfully read from MongoDB: {db_name}.{coll_name}")
+        return df
+        
+    except Exception as e:
+        print(f"Error reading from MongoDB: {str(e)}")
+        raise
 
 
 def read_postgres_table(spark, table_name) -> DataFrame:
@@ -93,11 +116,13 @@ def read_postgres_table(spark, table_name) -> DataFrame:
 
 def extract_data(spark: SparkSession):
     try:
+        # Read from MongoDB
         clickstream_df = read_from_mongodb(spark, MONGO_BROWSING_DB, "clickstream")
         products_df = read_from_mongodb(spark, MONGO_PRODUCTS_DB, "products")
         browsing_df = read_from_mongodb(spark, MONGO_BROWSING_DB, "browsing_history")
         searchs_df = read_from_mongodb(spark, MONGO_BROWSING_DB, "search_history")
 
+        # Read from NeonDB
         users_df = read_postgres_table(spark, "users")
         orders_df = read_postgres_table(spark, "orders")
         reviews_df = read_postgres_table(spark, "product_reviews")
@@ -123,6 +148,8 @@ def extract_data(spark: SparkSession):
         return preprocess_raw_data(users_df, orders_df, reviews_df, cart_df, wishlist_df, browsing_df, clickstream_df, session_df, products_df)
 
     except Exception as e:
+        print(f"\nERROR in extract_data: {str(e)}")
+
         collection.insert_one(document={
             "process_type": "batch",
             "caller_function": inspect.stack()[1].function,
@@ -137,7 +164,7 @@ def extract_data(spark: SparkSession):
             "at": datetime.now(),
             "comment": "Failure to extract the data from MongoDB or Postgresql."
         })
-        return None
+        raise
 
 
 def preprocess_raw_data(users_df, orders_df, reviews_df, cart_df, wishlist_df, browsing_df, clickstream_df, session_df, products_df):
@@ -367,31 +394,38 @@ def store_df_to_mongodb(db_name, collection_name, df: DataFrame, mode="append"):
             .option("collection", collection_name) \
             .save()
 
-        print("done")
+        print("DF is stored to MongoDB")
     except Exception as e:
         print(f"Error storing DataFrame to MongoDB: {e}")
 
 
 def update_doc_in_mongodb(db_name, collection_name, df, id_col):
-    db = client[db_name]
-    collection = db[collection_name]
+    try:
+        db = client[db_name]
+        collection = db[collection_name]
 
-    for row in df.collect():
-        doc = bson_safe(row)
-        id = doc[f"{id_col}"]
+        for row in df.collect():
+            doc = bson_safe(row)
+            id = doc[f"{id_col}"]
 
-        if "_id" in doc:
-            del doc["_id"]
+            if "_id" in doc:
+                del doc["_id"]
 
-        collection.update_one(
-            {f"{id_col}": id},
-            {"$set": doc},
-            upsert=True
-        )
+            collection.update_one(
+                {f"{id_col}": id},
+                {"$set": doc},
+                upsert=True
+            )
+
+        print("Docs are updated")
+    except Exception as e:
+        print(f"Error update the doc in MongoDB: {e}")
+        raise
+
 
 def bson_safe(obj):
     if isinstance(obj, Row):
-        return bson_safe(obj.asDict())  # Convert Row to dict first
+        return bson_safe(obj.asDict())
     elif isinstance(obj, dict):
         return {k: bson_safe(v) for k, v in obj.items()}
     elif isinstance(obj, list):
