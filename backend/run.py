@@ -6,15 +6,16 @@ import sys
 import time
 from flask_cors import CORS
 
-from backend.app.services.service_locator import tracking_service
 from databases.postgres.neon_postgres_connector import NeonPostgresConnector
 
 from app.controllers.user_controller import user_blueprint
-from app.controllers.main_controller import main_controller_blueprint
 from app.controllers.product_controller import product_controller_blueprint
 from app.controllers.merchant_controller import merchant_controller_blueprint
 from app.controllers.cart_wishlist_controller import cart_wishlist_controller_blueprint
 from app.controllers.order_controller import order_bp
+from redis_app.controllers.redis_controller import redis_main_controller_blueprint
+from app.controllers.main_controller import main_controller_blueprint
+from app.services.service_locator import tracking_service
 from config import JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES
 
 # Add the app directory to the Python path
@@ -79,6 +80,7 @@ if __name__ == '__main__':
     #app.register_blueprint(merchant_controller_blueprint)
     app.register_blueprint(cart_wishlist_controller_blueprint)
     app.register_blueprint(order_bp)
+    app.register_blueprint(redis_main_controller_blueprint)
 
     # Error handlers
     @app.errorhandler(404)
