@@ -1,13 +1,33 @@
+import subprocess
+import sys
+import os
+
+from config import GS_BUCKET_ENV_PATH, GS_BUCKET_REQUIREMENTS_PATH, GS_BUCKET_CONFIG_PY_PATH
+
+try:
+    # Download .env and config files from GCS
+    subprocess.check_call(['gsutil', 'cp', GS_BUCKET_ENV_PATH, '/tmp/.env'])
+    subprocess.check_call(['gsutil', 'cp', GS_BUCKET_CONFIG_PY_PATH, '/tmp/config.py'])
+    
+    # Add /tmp to Python path, so can be import config.py
+    sys.path.insert(0, '/tmp')
+    
+    # Download and install requirements
+    subprocess.check_call(['gsutil', 'cp', GS_BUCKET_REQUIREMENTS_PATH, '/tmp/requirements.txt'])
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-r', '/tmp/requirements.txt'])
+    print("Requirements are installed")
+except Exception as e:
+    print(f"Error while setting up environment: {str(e)}")
+    sys.exit(1)
+
 import schedule
 import time
 from datetime import datetime
 import logging
 import sys
-from dotenv import load_dotenv
-import os
 
-from Batch.UserBatchProcess.user_batch_stream_engine import UserBatchService
-from Batch.ItemBatchProcess.item_batch_stream_engine import ItemBatchService
+from user_batch_stream_engine import UserBatchService
+from item_batch_stream_engine import ItemBatchService
 
 
 class ColoredFormatter(logging.Formatter):
