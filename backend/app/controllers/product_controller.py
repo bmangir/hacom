@@ -36,6 +36,11 @@ def display_details(product_id):
         user_id = session.get('user_id')
         in_wishlist = wishlist_service.is_in_wishlist(user_id, product_id)
 
+        # Get top 5 reviews
+        all_reviews = ITEM_RECOMMENDATION_SERVICE.get_product_reviews(product_id)
+        reviews = all_reviews[:5] if all_reviews else []
+        total_reviews = len(all_reviews)
+
         # Get similar products and category-based recommendations
         ibcf_similar_products = ITEM_RECOMMENDATION_SERVICE.get_ibcf_recommendations(product_id)  # Primary model
         category_products = ITEM_RECOMMENDATION_SERVICE.get_top_n_product_based_on_category(item_id=product_id, category=product['category'])
@@ -51,6 +56,8 @@ def display_details(product_id):
         return render_template(
             "product_details.html",
             product=product,
+            reviews=reviews,
+            total_reviews=total_reviews,
             in_wishlist=in_wishlist,
             similar_products=ibcf_similar_products,
             category_products=category_products,
@@ -73,13 +80,17 @@ def display_reviews(product_id):
     """Show all reviews for a product"""
     try:
         product = ITEM_RECOMMENDATION_SERVICE.get_product_details(product_id)
-        review_based_reccs = ITEM_RECOMMENDATION_SERVICE.get_reviewed_based_items()
         if not product:
             return "Product not found", 404
+
+        # Get all reviews
+        reviews = ITEM_RECOMMENDATION_SERVICE.get_product_reviews(product_id)
+        review_based_reccs = ITEM_RECOMMENDATION_SERVICE.get_reviewed_based_items()
 
         return render_template(
             "product_reviews.html",
             product=product,
+            reviews=reviews,
             review_based_reccs=review_based_reccs
         )
 

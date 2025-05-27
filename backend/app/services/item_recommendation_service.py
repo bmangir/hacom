@@ -1,11 +1,13 @@
 from sentence_transformers import SentenceTransformer
 import google.generativeai as genai
+import time
 
 from backend.app.models.item_models import IBCF, BestSellers, NewArrivals, SeasonalRecc, Trending, ReviewedBased, \
     TrendingCategories
 from backend.app.models.user_models import ProductDetails
 from backend.utils.utils import _get_product_details
 from backend.config import pc, ITEM_CONTENTS_HOST, client, MONGO_PRODUCTS_DB, GEMINI_API_KEY
+from databases.postgres.neon_postgres_connector import NeonPostgresConnector
 
 
 class ItemRecommendationService:
@@ -64,10 +66,10 @@ class ItemRecommendationService:
                 return cached_items
 
             # If not in cache, get from MongoDB
-            items = IBCF.objects(source="bought_together").limit(5)
+            items = IBCF.objects(product_id=product_id, recommendation_type="bought_together").limit(5)
             ids = []
             for item in items:
-                ids += item.bought_together
+                ids += item.recc_items  # Using recc_items field instead of bought_together
 
             result = _get_product_details(ids)
 
@@ -181,12 +183,10 @@ class ItemRecommendationService:
 
         return result
 
-    def search(self, query: str, top_k: int = 40):
+    def search(self, query: str, top_k: int = 3):
         try:
             # Refine query using Gemini
             refined_query = self.refine_query_with_gemini(query)
-            print(f"Original query: {query}")
-            print(f"Refined query: {refined_query}")
             
             index = pc.Index(host=ITEM_CONTENTS_HOST)
             query_vector = self.content_model.encode(refined_query).tolist()
@@ -309,3 +309,57 @@ class ItemRecommendationService:
             self.cache.set_item_recommendations(product_id, [item], "details")
 
         return item
+
+    def get_product_reviews(self, product_id: str):
+        """Get reviews for a product with user details."""
+        # Try to get from cache first
+        cached_reviews = self.cache.get_item_recommendations(product_id, "reviews")
+        if cached_reviews:
+            return cached_reviews
+
+        conn = None
+        cursor = None
+        try:
+            conn = NeonPostgresConnector.get_connection()
+            cursor = conn.cursor()
+
+            # Get reviews with user information
+            review_query = """
+                SELECT r.review_id, r.rating, r.review_text, r.review_date, r.review_helpful_count,
+                       u.first_name, u.last_name
+                FROM product_reviews r
+                JOIN users u ON r.user_id = u.user_id
+                WHERE r.product_id = %s
+                ORDER BY r.review_date DESC
+            """
+            cursor.execute(review_query, [product_id])
+            reviews = cursor.fetchall()
+
+            # Format reviews
+            formatted_reviews = []
+            for review in reviews:
+                review_id, rating, comment, review_date, helpful_count, first_name, last_name = review
+                formatted_reviews.append({
+                    'review_id': review_id,
+                    'rating': rating,
+                    'comment': comment,
+                    'date': review_date,
+                    'helpful_count': helpful_count or 0,
+                    'first_name': first_name,
+                    'last_name': last_name
+                })
+
+            # Cache the results
+            if formatted_reviews:
+                self.cache.set_item_recommendations(product_id, formatted_reviews, "reviews")
+
+            return formatted_reviews
+
+        except Exception as e:
+            print(f"Error getting product reviews: {str(e)}")
+            return []
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                NeonPostgresConnector.return_connection(conn)
