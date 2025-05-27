@@ -2,142 +2,331 @@
 
 {% block title %}Profile Details{% endblock %}
 
-{% block content %}
-<div class="container mt-4">
-    <div class="row">
-        <!-- Profile Overview -->
-        <div class="col-md-4">
-            <div class="card mb-4">
-                <div class="card-body text-center">
-                    <img src="{{ user.profile.profile_picture or url_for('static', filename='images/default-avatar.png') }}" 
-                         class="rounded-circle img-fluid mb-3" style="width: 150px; height: 150px; object-fit: cover;">
-                    <h4>{{ user.profile.first_name }} {{ user.profile.last_name }}</h4>
-                    <p class="text-muted mb-1">{{ user.profile.email }}</p>
-                    <p class="text-muted mb-3">Member since {{ user.profile.created_at }}</p>
-                    <div class="d-flex justify-content-center mb-2">
-                        <a href="{{ url_for('user_blueprint.settings') }}" class="btn btn-primary">Edit Profile</a>
-                    </div>
-                </div>
-            </div>
+{% block additional_styles %}
+.profile-container {
+    max-width: 1200px;
+    margin: 30px auto;
+    padding: 0 20px;
+}
 
-            <!-- Statistics -->
-            <div class="card mb-4">
-                <div class="card-body">
-                    <h5 class="card-title">Statistics</h5>
-                    <div class="row text-center">
-                        <div class="col-6 mb-3">
-                            <h6>Orders</h6>
-                            <h4>{{ user.statistics.total_orders }}</h4>
-                        </div>
-                        <div class="col-6 mb-3">
-                            <h6>Reviews</h6>
-                            <h4>{{ user.statistics.total_reviews }}</h4>
+.profile-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    margin-bottom: 25px;
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.profile-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+}
+
+.profile-header {
+    text-align: center;
+    padding: 30px;
+    background: linear-gradient(135deg, #162938, #2a3f54);
+    color: white;
+}
+
+.profile-avatar {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    border: 5px solid rgba(255,255,255,0.3);
+    object-fit: cover;
+    margin-bottom: 15px;
+}
+
+.profile-name {
+    font-size: 1.8em;
+    margin: 10px 0;
+    font-weight: 600;
+}
+
+.profile-email {
+    color: rgba(255,255,255,0.8);
+    margin-bottom: 10px;
+}
+
+.member-since {
+    font-size: 0.9em;
+    color: rgba(255,255,255,0.7);
+}
+
+.edit-profile-btn {
+    background: #ff7b00;
+    color: white;
+    padding: 10px 25px;
+    border-radius: 25px;
+    border: none;
+    font-weight: 600;
+    margin-top: 15px;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.edit-profile-btn:hover {
+    background: #ff3d00;
+    transform: translateY(-2px);
+    color: white;
+}
+
+.stats-container {
+    padding: 20px;
+    background: white;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 15px;
+}
+
+.stat-value {
+    font-size: 1.8em;
+    font-weight: 600;
+    color: #162938;
+    margin: 5px 0;
+}
+
+.stat-label {
+    color: #666;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.profile-info {
+    padding: 25px;
+}
+
+.info-row {
+    display: flex;
+    margin-bottom: 20px;
+    align-items: center;
+}
+
+.info-label {
+    width: 120px;
+    color: #666;
+    font-weight: 600;
+}
+
+.info-value {
+    flex: 1;
+    color: #162938;
+}
+
+.activity-card {
+    margin-top: 25px;
+}
+
+.activity-item {
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+    transition: background-color 0.3s ease;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-item:hover {
+    background-color: #f8f9fa;
+}
+
+.activity-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.activity-type {
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+    color: #162938;
+}
+
+.activity-icon {
+    margin-right: 10px;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.order-icon {
+    background: rgba(0, 196, 255, 0.1);
+    color: #00C4FF;
+}
+
+.review-icon {
+    background: rgba(255, 193, 7, 0.1);
+    color: #ffc107;
+}
+
+.activity-date {
+    color: #888;
+    font-size: 0.9em;
+}
+
+.activity-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.activity-amount {
+    font-weight: 600;
+    color: #162938;
+}
+
+.view-product-btn {
+    padding: 8px 20px;
+    background: linear-gradient(135deg, #ff7b00, #ff3d00);
+    color: white;
+    border: none;
+    border-radius: 20px;
+    font-size: 0.9em;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.view-product-btn:hover {
+    background: linear-gradient(135deg, #ff3d00, #ff7b00);
+    transform: translateY(-2px);
+    color: white;
+}
+
+.section-title {
+    color: #162938;
+    font-size: 1.5em;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #FF8C42;
+}
+{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="row">
+        <!-- Left Column -->
+        <div class="col-md-4">
+            <!-- Profile Overview -->
+            <div class="profile-card">
+                <div class="profile-header">
+                    <img src="{{ user.profile.profile_picture or url_for('static', filename='images/default-avatar.png') }}" 
+                         class="profile-avatar" alt="Profile Picture">
+                    <h2 class="profile-name">{{ user.profile.first_name }} {{ user.profile.last_name }}</h2>
+                    <p class="profile-email">{{ user.profile.email }}</p>
+                    <p class="member-since">Member since {{ user.profile.created_at }}</p>
+                    <a href="{{ url_for('user_blueprint.settings') }}" class="edit-profile-btn">
+                        <i class="fas fa-edit"></i> Edit Profile
+                    </a>
+                </div>
+                
+                <!-- Statistics -->
+                <div class="stats-container">
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="stat-item">
+                                <div class="stat-value">{{ user.statistics.total_orders }}</div>
+                                <div class="stat-label">Orders</div>
+                            </div>
                         </div>
                         <div class="col-6">
-                            <h6>Visits</h6>
-                            <h4>{{ user.statistics.total_visits }}</h4>
+                            <div class="stat-item">
+                                <div class="stat-value">{{ user.statistics.total_reviews }}</div>
+                                <div class="stat-label">Reviews</div>
+                            </div>
                         </div>
-                        <div class="col-6">
-                            <h6>Total Spent</h6>
-                            <h4>${{ "%.2f"|format(user.statistics.total_spent) }}</h4>
+                        <div class="col-12">
+                            <div class="stat-item">
+                                <div class="stat-value">${{ "%.2f"|format(user.statistics.total_spent) }}</div>
+                                <div class="stat-label">Total Spent</div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Profile Details -->
+        <!-- Right Column -->
         <div class="col-md-8">
-            <div class="card mb-4">
-                <div class="card-body">
-                    <h5 class="card-title">Profile Information</h5>
-                    <div class="row">
-                        <div class="col-sm-3">
-                            <p class="mb-0">Full Name</p>
-                        </div>
-                        <div class="col-sm-9">
-                            <p class="text-muted mb-0">{{ user.profile.first_name }} {{ user.profile.last_name }}</p>
-                        </div>
+            <!-- Profile Information -->
+            <div class="profile-card">
+                <div class="profile-info">
+                    <h3 class="section-title">Profile Information</h3>
+                    <div class="info-row">
+                        <div class="info-label">Full Name</div>
+                        <div class="info-value">{{ user.profile.first_name }} {{ user.profile.last_name }}</div>
                     </div>
-                    <hr>
-                    <div class="row">
-                        <div class="col-sm-3">
-                            <p class="mb-0">Email</p>
-                        </div>
-                        <div class="col-sm-9">
-                            <p class="text-muted mb-0">{{ user.profile.email }}</p>
-                        </div>
+                    <div class="info-row">
+                        <div class="info-label">Email</div>
+                        <div class="info-value">{{ user.profile.email }}</div>
                     </div>
-                    <hr>
-                    <div class="row">
-                        <div class="col-sm-3">
-                            <p class="mb-0">Phone</p>
-                        </div>
-                        <div class="col-sm-9">
-                            <p class="text-muted mb-0">{{ user.profile.phone_number or 'Not provided' }}</p>
-                        </div>
+                    <div class="info-row">
+                        <div class="info-label">Phone</div>
+                        <div class="info-value">{{ user.profile.phone_number or 'Not provided' }}</div>
                     </div>
-                    <hr>
-                    <div class="row">
-                        <div class="col-sm-3">
-                            <p class="mb-0">Gender</p>
-                        </div>
-                        <div class="col-sm-9">
-                            <p class="text-muted mb-0">{{ user.profile.gender|title or 'Not specified' }}</p>
-                        </div>
+                    <div class="info-row">
+                        <div class="info-label">Gender</div>
+                        <div class="info-value">{{ user.profile.gender|title or 'Not specified' }}</div>
                     </div>
-                    <hr>
-                    <div class="row">
-                        <div class="col-sm-3">
-                            <p class="mb-0">Birth Date</p>
-                        </div>
-                        <div class="col-sm-9">
-                            <p class="text-muted mb-0">{{ user.profile.birthdate or 'Not provided' }}</p>
-                        </div>
+                    <div class="info-row">
+                        <div class="info-label">Birth Date</div>
+                        <div class="info-value">{{ user.profile.birthdate or 'Not provided' }}</div>
                     </div>
-                    <hr>
-                    <div class="row">
-                        <div class="col-sm-3">
-                            <p class="mb-0">Address</p>
-                        </div>
-                        <div class="col-sm-9">
-                            <p class="text-muted mb-0">{{ user.profile.address or 'Not provided' }}</p>
-                        </div>
+                    <div class="info-row">
+                        <div class="info-label">Address</div>
+                        <div class="info-value">{{ user.profile.address or 'Not provided' }}</div>
                     </div>
                 </div>
             </div>
 
             <!-- Recent Activity -->
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Recent Activity</h5>
+            <div class="profile-card activity-card">
+                <div class="profile-info">
+                    <h3 class="section-title">Recent Activity</h3>
                     {% if user.recent_activity %}
-                        <div class="list-group">
-                            {% for activity in user.recent_activity %}
-                                <div class="list-group-item">
-                                    <div class="d-flex w-100 justify-content-between">
-                                        <h6 class="mb-1">
-                                            {% if activity.type == 'order' %}
-                                                <i class="fas fa-shopping-cart text-primary me-2"></i>
-                                                New Order
-                                            {% else %}
-                                                <i class="fas fa-star text-warning me-2"></i>
-                                                New Review
-                                            {% endif %}
-                                        </h6>
-                                        <small class="text-muted">{{ activity.date }}</small>
+                        {% for activity in user.recent_activity %}
+                            <div class="activity-item">
+                                <div class="activity-header">
+                                    <div class="activity-type">
+                                        {% if activity.type == 'order' %}
+                                            <div class="activity-icon order-icon">
+                                                <i class="fas fa-shopping-cart"></i>
+                                            </div>
+                                            New Order
+                                        {% else %}
+                                            <div class="activity-icon review-icon">
+                                                <i class="fas fa-star"></i>
+                                            </div>
+                                            New Review
+                                        {% endif %}
                                     </div>
-                                    <p class="mb-1">
+                                    <div class="activity-date">{{ activity.date }}</div>
+                                </div>
+                                <div class="activity-details">
+                                    <div class="activity-amount">
                                         {% if activity.type == 'order' %}
                                             Order total: ${{ "%.2f"|format(activity.amount) }}
                                         {% else %}
                                             Rating: {{ activity.amount }}/5
                                         {% endif %}
-                                    </p>
-                                    <small class="text-muted">Product ID: {{ activity.product_id }}</small>
+                                    </div>
+                                    <a href="/product/{{ activity.product_id }}" class="view-product-btn">
+                                        View Product <i class="fas fa-arrow-right"></i>
+                                    </a>
                                 </div>
-                            {% endfor %}
-                        </div>
+                            </div>
+                        {% endfor %}
                     {% else %}
                         <p class="text-muted">No recent activity</p>
                     {% endif %}

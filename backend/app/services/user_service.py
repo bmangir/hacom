@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 from backend.app.models.user_models import ProductDetails
 from backend.config import MONGO_BROWSING_DB, MONGO_PRODUCTS_DB, client
+from backend.utils.utils import _get_product_details
 from databases.mongo.mongo_connector import MongoConnector
 from databases.postgres.neon_postgres_connector import NeonPostgresConnector
 
@@ -36,43 +37,15 @@ class UserService:
             if conn:
                 NeonPostgresConnector.return_connection(conn)
 
-    """def get_recently_viewed_products(self, user_id, limit=10):
-        Get recently viewed products for a user.
-        try:
-            browsing_collection = client[MONGO_BROWSING_DB]['browsing_history']
-            browsing_df = pd.DataFrame(list(browsing_collection.find({}, {'_id': 0})))
-
-            # Get recent product views from browsing history
-            recent_views = browsing_df[
-                (browsing_df['user_id'] == user_id) &
-                (browsing_df['page_url'].str.contains('/product/'))
-                ].sort_values('timestamp', ascending=False)
-
-            # Extract product IDs from URLs
-            product_ids = recent_views['page_url'].str.extract(r'/product/(.+)')[0].unique()[:limit]
-
-            # Get product details
-            products = []
-            for prod_id in product_ids:
-                #product = get_product_details(prod_id)
-                product = client[MONGO_PRODUCTS_DB]['products'].find_one({'product_id': prod_id}, {'_id': 0})
-                if product:
-                    products.append(product)
-
-            return products
-        except Exception as e:
-            print(f"Error getting recently viewed products: {str(e)}")
-            return []"""
     def get_recently_viewed_products(self, user_id, limit=10):
         """Get recently viewed products for a user."""
         try:
             browsing_collection = client[MONGO_BROWSING_DB]['browsing_history']
 
-            # MongoDB'de filtrele, sıralayıp sınırla
             cursor = browsing_collection.find(
                 {
                     'user_id': user_id,
-                    'page_url': {'$regex': '/product/'}
+                    'page_url': {'$regex': '(/product/|/products/details/)'}
                 },
                 {'_id': 0, 'page_url': 1, 'timestamp': 1}
             ).sort('timestamp', -1).limit(limit * 2)  # limit*2: to avoid for same product
@@ -81,23 +54,26 @@ class UserService:
             seen = set()
 
             for doc in cursor:
-                match = re.search(r'/product/([^/?#]+)', doc['page_url'])
+                match = re.search(r'/product/([^/?#]+)|/products/details/([^/?#]+)', doc['page_url'])
                 if match:
-                    pid = match.group(1)
+                    # Get the product ID from whichever group matched (first or second)
+                    pid = match.group(1) if match.group(1) else match.group(2)
                     if pid not in seen:
-                        seen.add(pid)
-                        product_ids.append(pid)
+                        if not (pid is None or pid == 'None'):
+                            seen.add(pid)
+                            product_ids.append(pid)
                 if len(product_ids) >= limit:
                     break
 
-            # Ürün detaylarını çek
-            products = []
-            for prod_id in product_ids:
-                product = client[MONGO_PRODUCTS_DB]['products'].find_one(
-                    {'product_id': prod_id}, {'_id': 0}
-                )
-                if product:
-                    products.append(product)
+            #products = []
+            #for prod_id in product_ids:
+            #    product = client[MONGO_PRODUCTS_DB]['products'].find_one(
+            #        {'product_id': prod_id}, {'_id': 0}
+            #    )
+            #    if product:
+            #        products.append(product)
+
+            products = _get_product_details(product_ids)
 
             return products
 
@@ -196,63 +172,17 @@ class UserService:
             if conn:
                 NeonPostgresConnector.return_connection(conn)
 
-    def get_total_purchased_products(self, user_id, date_range='all'):
-        """Get total count of purchased products for pagination."""
-        conn = None
-        cursor = None
-        try:
-            # Connect to PostgreSQL
-            conn = NeonPostgresConnector.get_connection()
-            cursor = conn.cursor()
-
-            # Base query
-            query = "SELECT COUNT(DISTINCT order_id) FROM orders WHERE user_id = %s"
-            params = [user_id]
-
-            # Apply date range filter
-            if date_range != 'all':
-                date_filter = {
-                    'today': datetime.now().replace(hour=0, minute=0, second=0, microsecond=0),
-                    'week': datetime.now() - timedelta(days=7),
-                    'month': datetime.now() - timedelta(days=30)
-                }
-                if date_range in date_filter:
-                    query += " AND order_date >= %s"
-                    params.append(date_filter[date_range])
-
-            # Execute query
-            cursor.execute(query, params)
-            total = cursor.fetchone()[0]
-            return total
-
-        except Exception as e:
-            print(f"Error getting total purchased products: {str(e)}")
-            return 0
-        finally:
-            if cursor:
-                cursor.close()
-            if conn:
-                NeonPostgresConnector.return_connection(conn)
-
     def get_visited_products(self, user_id, date_range='all', sort_by='recent', page=1, per_page=12):
         """Get visited products with filtering and pagination."""
         try:
-            # Connect to MongoDB
-            if not client:
-                print("MongoDB connection failed")
-                return {'products': [], 'total': 0}
-
             browsing_collection = client[MONGO_BROWSING_DB]['browsing_history']
-            products_collection = client[MONGO_PRODUCTS_DB]['products']
 
             # Base pipeline for aggregation
             pipeline = [
                 {'$match': {'user_id': user_id, 'page_url': {'$regex': '/product/'}}},
-                # Extract product_id from page_url
                 {'$addFields': {
                     'product_id': {'$arrayElemAt': [{'$split': ['$page_url', '/']}, -1]}
                 }},
-                # Group by product_id to get latest visit
                 {'$group': {
                     '_id': '$product_id',
                     'last_visit': {'$max': '$timestamp'},
@@ -298,7 +228,6 @@ class UserService:
             # Get product details
             products = []
             for visit in visits:
-                #product = products_collection.find_one({'product_id': visit['_id']}, {'_id': 0})
                 product = ProductDetails.objects(product_id=visit['_id']).first()
                 if product:
                     product_data = product.to_mongo().to_dict()
@@ -319,32 +248,6 @@ class UserService:
         except Exception as e:
             print(f"Error getting visited products: {str(e)}")
             return {'products': [], 'total': 0}
-
-    def get_total_visited_products(self, user_id, date_range='all'):
-        """Get total count of visited products for pagination."""
-        try:
-            browsing_collection = client[MONGO_BROWSING_DB]['browsing_history']
-
-            # Base query
-            query = {'user_id': user_id, 'page_url': {'$regex': '/product/'}}
-
-            # Apply date range filter
-            if date_range != 'all':
-                date_filter = {
-                    'today': datetime.now().replace(hour=0, minute=0, second=0, microsecond=0),
-                    'week': datetime.now() - timedelta(days=7),
-                    'month': datetime.now() - timedelta(days=30)
-                }
-                if date_range in date_filter:
-                    query['timestamp'] = {'$gte': date_filter[date_range].timestamp()}
-
-            # Get total count
-            total = browsing_collection.count_documents(query)
-            return total
-
-        except Exception as e:
-            print(f"Error getting total visited products: {str(e)}")
-            return 0
 
     def get_user_reviews(self, user_id, date_range='all', sort_by='recent', page=1, per_page=12):
         """Get user reviews with filtering and pagination."""
@@ -444,7 +347,7 @@ class UserService:
 
             # Get user profile information (matching get_user_details)
             profile_query = """
-                SELECT u.email, u.first_name, u.last_name, u.gender, u.birthdate, u.address, u.join_date
+                SELECT u.email, u.first_name, u.last_name, u.gender, u.birth_date, u.address, u.join_date
                 FROM users u
                 WHERE u.user_id = %s
             """
@@ -560,7 +463,7 @@ class UserService:
             #    WHERE u.user_id = %s
             #"""
             profile_query = """
-                SELECT u.email, u.first_name, u.last_name, u.gender, u.birthdate, u.address, u.join_date
+                SELECT u.email, u.first_name, u.last_name, u.gender, u.birth_date, u.address, u.join_date
                 FROM users u
                 WHERE u.user_id = %s
             """
@@ -575,17 +478,16 @@ class UserService:
                 SELECT 
                     (SELECT COUNT(*) FROM orders WHERE user_id = %s) as total_orders,
                     (SELECT COUNT(*) FROM product_reviews WHERE user_id = %s) as total_reviews,
-                    (SELECT COUNT(*) FROM browsing_history WHERE user_id = %s) as total_visits,
                     (SELECT SUM(total_amount) FROM orders WHERE user_id = %s) as total_spent
             """
-            cursor.execute(stats_query, [user_id, user_id, user_id, user_id])
+            cursor.execute(stats_query, [user_id, user_id, user_id])
             stats = cursor.fetchone()
 
             # Get recent activity
             activity_query = """
                 SELECT 
                     'order' as type,
-                    order_date as date,
+                    to_timestamp(order_date/1000) as date,
                     product_id,
                     total_amount as amount
                 FROM orders 
@@ -613,25 +515,17 @@ class UserService:
                     'gender': profile[3],
                     'birthdate': profile[4].strftime('%Y-%m-%d') if profile[4] else None,
                     'address': profile[5],
-                    #'phone_number': profile[6],
-                    #'profile_picture': profile[7],
                     'created_at': profile[6].strftime('%Y-%m-%d %H:%M:%S') if profile[6] else None,
-                    #'notification_preferences': profile[9] or {},
-                    #'privacy_settings': profile[10] or {},
-                    #'language_preference': profile[11] or 'en',
-                    #'currency_preference': profile[12] or 'USD',
-                    #'timezone': profile[13] or 'UTC'
                 },
                 'statistics': {
                     'total_orders': stats[0] or 0,
                     'total_reviews': stats[1] or 0,
-                    'total_visits': stats[2] or 0,
-                    'total_spent': float(stats[3]) if stats[3] else 0
+                    'total_spent': float(stats[2]) if stats[2] else 0
                 },
                 'recent_activity': [
                     {
                         'type': activity[0],
-                        'date': activity[1].strftime('%Y-%m-%d %H:%M:%S'),
+                        'date': activity[1].strftime('%Y-%m-%d %H:%M:%S') if activity[1] else None,
                         'product_id': activity[2],
                         'amount': float(activity[3]) if activity[0] == 'order' else int(activity[3])
                     }
