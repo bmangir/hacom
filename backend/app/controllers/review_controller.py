@@ -1,8 +1,10 @@
+import time
 from datetime import datetime
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash, session
 
 from backend.app.controllers import login_required
-from backend.app.services.service_locator import ITEM_RECOMMENDATION_SERVICE, PRODUCT_SERVICE, review_service
+from backend.app.services.service_locator import ITEM_RECOMMENDATION_SERVICE, PRODUCT_SERVICE, review_service, \
+    tracking_service
 
 review_bp = Blueprint('review', __name__)
 
@@ -23,6 +25,21 @@ def format_datetime(value):
 def display_reviews(product_id):
     """Show all reviews for a product"""
     try:
+        current_time = time.time()
+        last_page_time = session.get('last_page_time')
+        duration = int(current_time - last_page_time) if last_page_time else None
+
+        # Track remove from cart action with duration
+        tracking_service.track_user_action(
+            user_id=session.get('user_id'),
+            session_id=session.get('session_id'),
+            action='view_product_reviews',
+            page_url=request.path,
+            referrer=request.referrer,
+            duration_seconds=duration,
+            additional_data={"product_id": product_id}
+        )
+
         product = PRODUCT_SERVICE.get_product_details(product_id)
         if not product:
             return "Product not found", 404
@@ -48,6 +65,21 @@ def display_reviews(product_id):
 def review_form(product_id):
     """Show review form for create or update"""
     try:
+        current_time = time.time()
+        last_page_time = session.get('last_page_time')
+        duration = int(current_time - last_page_time) if last_page_time else None
+
+        # Track remove from cart action with duration
+        tracking_service.track_user_action(
+            user_id=session.get('user_id'),
+            session_id=session.get('session_id'),
+            action='create_or_update_review',
+            page_url=request.path,
+            referrer=request.referrer,
+            duration_seconds=duration,
+            additional_data={"product_id": product_id}
+        )
+
         product = PRODUCT_SERVICE.get_product_details(product_id)
         if not product:
             return jsonify({"status": "error", "error": "Product not found"}), 404
@@ -72,6 +104,21 @@ def review_form(product_id):
 @login_required
 def submit_review(product_id):
     try:
+        current_time = time.time()
+        last_page_time = session.get('last_page_time')
+        duration = int(current_time - last_page_time) if last_page_time else None
+
+        # Track remove from cart action with duration
+        tracking_service.track_user_action(
+            user_id=session.get('user_id'),
+            session_id=session.get('session_id'),
+            action='submit_review',
+            page_url=request.path,
+            referrer=request.referrer,
+            duration_seconds=duration,
+            additional_data={"product_id": product_id}
+        )
+
         rating = request.form.get('rating')
         comment = request.form.get('comment')
 
@@ -97,6 +144,21 @@ def submit_review(product_id):
 @login_required
 def delete_review(product_id):
     try:
+        current_time = time.time()
+        last_page_time = session.get('last_page_time')
+        duration = int(current_time - last_page_time) if last_page_time else None
+
+        # Track remove from cart action with duration
+        tracking_service.track_user_action(
+            user_id=session.get('user_id'),
+            session_id=session.get('session_id'),
+            action='delete_review',
+            page_url=request.path,
+            referrer=request.referrer,
+            duration_seconds=duration,
+            additional_data={"product_id": product_id}
+        )
+
         if not product_id:
             return jsonify({"status": "error", "error": "Product ID is required"}), 400
 

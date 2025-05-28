@@ -1,3 +1,5 @@
+import time
+
 from flask import request, Blueprint, jsonify, session, render_template, redirect, url_for
 import math
 
@@ -108,6 +110,21 @@ def login():
         session['first_name'] = user_service.get_user_first_name(result['user_id'])
         session['session_id'] = session_id
 
+        current_time = time.time()
+        last_page_time = session.get('last_page_time')
+        duration = int(current_time - last_page_time) if last_page_time else None
+
+        # Track remove from cart action with duration
+        tracking_service.track_user_action(
+            user_id=session['user_id'],
+            session_id=session.get('session_id'),
+            action='login',
+            page_url=request.path,
+            referrer=request.referrer,
+            duration_seconds=duration,
+            additional_data={}
+        )
+
         return jsonify({
             "success": True,
             "data": result,
@@ -128,7 +145,22 @@ def logout():
         if 'session_id' in session:
             session_service.end_session(session['session_id'])
 
+        current_time = time.time()
+        last_page_time = session.get('last_page_time')
+        duration = int(current_time - last_page_time) if last_page_time else None
+
+        # Track remove from cart action with duration
+        tracking_service.track_user_action(
+            user_id=session['user_id'],
+            session_id=session.get('session_id'),
+            action='logout',
+            page_url=request.path,
+            referrer=request.referrer,
+            duration_seconds=duration,
+            additional_data={}
+        )
         session.clear()
+
         return redirect(url_for('main_controller_blueprint.home'))
     except Exception as e:
         return jsonify({
@@ -143,6 +175,21 @@ def profile():
     user_id = session.get('user_id')
 
     try:
+        current_time = time.time()
+        last_page_time = session.get('last_page_time')
+        duration = int(current_time - last_page_time) if last_page_time else None
+
+        # Track remove from cart action with duration
+        tracking_service.track_user_action(
+            user_id=user_id,
+            session_id=session.get('session_id'),
+            action='view_profile',
+            page_url=request.path,
+            referrer=request.referrer,
+            duration_seconds=duration,
+            additional_data={}
+        )
+
         # Get recently visited products
         recent_products_result = user_service.get_visited_products(user_id=user_id)
         recent_products = recent_products_result.get('products', [])[:10] if recent_products_result else []
@@ -150,9 +197,6 @@ def profile():
         # Get purchased products
         purchased_products_result = user_service.get_purchased_products(user_id)
         purchased_products = purchased_products_result if purchased_products_result else {'orders': [], 'total': 0}
-
-        print(f"Recent Products: {recent_products}")
-        print(f"Purchased Products: {purchased_products}")
 
         return render_template(
             "user_profile.html",
@@ -178,6 +222,21 @@ def all_visits():
     per_page = 12  # Number of products per page
 
     try:
+        current_time = time.time()
+        last_page_time = session.get('last_page_time')
+        duration = int(current_time - last_page_time) if last_page_time else None
+
+        # Track remove from cart action with duration
+        tracking_service.track_user_action(
+            user_id=user_id,
+            session_id=session.get('session_id'),
+            action='view_all_visits',
+            page_url=request.path,
+            referrer=request.referrer,
+            duration_seconds=duration,
+            additional_data={}
+        )
+
         # Get visited products with filters
         visited_products = USER_RECOMMENDATION_SERVICE.get_visited_products(
             user_id=user_id,
@@ -233,6 +292,21 @@ def all_purchases():
     per_page = 12  # Number of orders per page
 
     try:
+        current_time = time.time()
+        last_page_time = session.get('last_page_time')
+        duration = int(current_time - last_page_time) if last_page_time else None
+
+        # Track remove from cart action with duration
+        tracking_service.track_user_action(
+            user_id=user_id,
+            session_id=session.get('session_id'),
+            action='view_all_purchases',
+            page_url=request.path,
+            referrer=request.referrer,
+            duration_seconds=duration,
+            additional_data={}
+        )
+
         # Get purchased orders with filters
         result = user_service.get_purchased_products(
             user_id=user_id,
@@ -284,6 +358,21 @@ def my_reviews():
     per_page = 12  # Number of reviews per page
 
     try:
+        current_time = time.time()
+        last_page_time = session.get('last_page_time')
+        duration = int(current_time - last_page_time) if last_page_time else None
+
+        # Track remove from cart action with duration
+        tracking_service.track_user_action(
+            user_id=user_id,
+            session_id=session.get('session_id'),
+            action='view_my_reviews',
+            page_url=request.path,
+            referrer=request.referrer,
+            duration_seconds=duration,
+            additional_data={}
+        )
+
         # Get user reviews with filters
         reviews = user_service.get_user_reviews(
             user_id=user_id,
@@ -351,6 +440,20 @@ def settings():
                     "message": error
                 }), 400
 
+            current_time = time.time()
+            last_page_time = session.get('last_page_time')
+            duration = int(current_time - last_page_time) if last_page_time else None
+
+            # Track remove from cart action with duration
+            tracking_service.track_user_action(
+                user_id=user_id,
+                session_id=session.get('session_id'),
+                action='update_settings',
+                page_url=request.path,
+                referrer=request.referrer,
+                duration_seconds=duration,
+                additional_data={}
+            )
             return jsonify({
                 "success": True,
                 "message": "Settings updated successfully"
@@ -363,6 +466,21 @@ def settings():
             }), 500
 
     try:
+        current_time = time.time()
+        last_page_time = session.get('last_page_time')
+        duration = int(current_time - last_page_time) if last_page_time else None
+
+        # Track remove from cart action with duration
+        tracking_service.track_user_action(
+            user_id=user_id,
+            session_id=session.get('session_id'),
+            action='seek_settings',
+            page_url=request.path,
+            referrer=request.referrer,
+            duration_seconds=duration,
+            additional_data={}
+        )
+
         # Get user settings
         settings = user_service.get_user_settings(user_id)
         return render_template("user_settings.html", settings=settings)
@@ -377,6 +495,21 @@ def profile_details():
     user_id = session.get('user_id')
     
     try:
+        current_time = time.time()
+        last_page_time = session.get('last_page_time')
+        duration = int(current_time - last_page_time) if last_page_time else None
+
+        # Track remove from cart action with duration
+        tracking_service.track_user_action(
+            user_id=user_id,
+            session_id=session.get('session_id'),
+            action='view_profile_details',
+            page_url=request.path,
+            referrer=request.referrer,
+            duration_seconds=duration,
+            additional_data={}
+        )
+
         # Get user details
         user_details = user_service.get_user_details(user_id)
         return render_template("user_details.html", user=user_details)
@@ -393,6 +526,21 @@ def notifications():
     per_page = 10  # Number of notifications per page
 
     try:
+        current_time = time.time()
+        last_page_time = session.get('last_page_time')
+        duration = int(current_time - last_page_time) if last_page_time else None
+
+        # Track remove from cart action with duration
+        tracking_service.track_user_action(
+            user_id=user_id,
+            session_id=session.get('session_id'),
+            action='view_notifications',
+            page_url=request.path,
+            referrer=request.referrer,
+            duration_seconds=duration,
+            additional_data={}
+        )
+
         # Get user notifications
         #notifications = user_service.get_user_notifications(
         #    user_id=user_id,

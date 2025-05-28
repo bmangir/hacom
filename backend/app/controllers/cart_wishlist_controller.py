@@ -123,6 +123,20 @@ def view_cart():
         products = []
         total = 0
 
+        current_time = time.time()
+        last_page_time = session.get('last_page_time')
+        duration = int(current_time - last_page_time) if last_page_time else None
+
+        # Track remove from cart action with duration
+        tracking_service.track_user_action(
+            user_id=user_id,
+            session_id=session.get('session_id'),
+            action='view_cart',
+            page_url=request.path,
+            referrer=request.referrer,
+            duration_seconds=duration
+        )
+
         for item in cart_items:
             product = _get_product_details([item['product_id']])[0]
             if product:
