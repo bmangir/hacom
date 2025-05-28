@@ -133,7 +133,7 @@ def category_products(category_name):
         # Update last page time
         session['last_page_time'] = current_time
 
-        products = ITEM_RECOMMENDATION_SERVICE.get_products_by_category(category_name)
+        products = PRODUCT_SERVICE.get_products_by_category(category_name)
         return render_template("category_products.html",
                                category=category_name,
                                products=products)
