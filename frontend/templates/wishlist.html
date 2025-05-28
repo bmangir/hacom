@@ -76,7 +76,10 @@
         {% for item in wishlist_items %}
         <li class="wishlist-item">
             <a href="/product/{{ item.id }}">
-                <img src="{{ item.image_url }}" alt="{{ item.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                <img src="{{ item.image_url }}" 
+                     alt="{{ item.name }}" 
+                     onerror="handleProductImageError(this, '{{ item.category }}')"
+                     loading="lazy">
             </a>
             <div class="wishlist-item-info">
                 <a href="/product/{{ item.id }}">

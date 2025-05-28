@@ -271,7 +271,7 @@ background-color: #eaf4ff;
         {% for product in recommended_products %}
         <div class="product-card">
             <div class="product-image">
-                <img src="{{ product.image_url }}" alt="{{ product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                <img src="{{ product.image_url }}" alt="{{ product.name }}" onerror="handleProductImageError(this, '{{ product.category }}')" loading="lazy">
             </div>
             <div class="product-info">
                 <h3>{{ product.name }}</h3>
@@ -291,7 +291,7 @@ background-color: #eaf4ff;
     <div class="category-list">
         {% for category in most_visited_categories %}
         <div class="category-item">
-            <a href="/category/{{ category|urlencode }}">{{ category|title }}</a>
+            <a href="/category/{{ category|lower|urlencode }}">{{ category|title }}</a>
         </div>
         {% endfor %}
     </div>
@@ -303,7 +303,7 @@ background-color: #eaf4ff;
         {% for product in content_based_reccommendations %}
         <div class="product-card">
             <div class="product-image">
-                <img src="{{ product.image_url }}" alt="{{ product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                <img src="{{ product.image_url }}" alt="{{ product.name }}" onerror="handleProductImageError(this, '{{ product.category }}')" loading="lazy">
             </div>
             <div class="product-info">
                 <h3>{{ product.name }}</h3>

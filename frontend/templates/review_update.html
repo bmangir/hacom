@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_update %}Update{% else %}Write{% endif %} Review - HACOM{% endblock %}
+
+{% block additional_styles %}
+.review-update-container {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 20px;
+}
+
+.review-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.product-info {
+    display: flex;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+}
+
+.product-image {
+    width: 100px;
+    height: 100px;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-right: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.product-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.product-details h2 {
+    margin: 0;
+    color: #162938;
+    font-size: 1.5em;
+    margin-bottom: 5px;
+}
+
+.product-price {
+    color: #00C4FF;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.review-form {
+    padding: 30px;
+}
+
+.form-group {
+    margin-bottom: 25px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 10px;
+    color: #162938;
+    font-weight: 500;
+}
+
+.rating-group {
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.rating-group input {
+    display: none;
+}
+
+.rating-group label {
+    cursor: pointer;
+    font-size: 2em;
+    color: #ddd;
+    transition: color 0.2s ease;
+}
+
+.rating-group label:hover,
+.rating-group label:hover ~ label,
+.rating-group input:checked ~ label {
+    color: #ffcc00;
+}
+
+textarea {
+    width: 100%;
+    min-height: 150px;
+    padding: 15px;
+    border: 2px solid #eee;
+    border-radius: 10px;
+    font-size: 1rem;
+    line-height: 1.5;
+    transition: border-color 0.3s ease;
+    resize: vertical;
+}
+
+textarea:focus {
+    outline: none;
+    border-color: #00C4FF;
+}
+
+.button-group {
+    display: flex;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+.submit-btn, .cancel-btn {
+    flex: 1;
+    padding: 12px 25px;
+    border-radius: 25px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    text-decoration: none;
+}
+
+.submit-btn {
+    background: linear-gradient(135deg, #ff7b00, #ff3d00);
+    color: white;
+    border: none;
+}
+
+.submit-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 61, 0, 0.2);
+}
+
+.cancel-btn {
+    background: #f8f9fa;
+    color: #162938;
+    border: 2px solid #162938;
+}
+
+.cancel-btn:hover {
+    background: #162938;
+    color: white;
+}
+
+.previous-review {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border-left: 4px solid #FF8C42;
+}
+
+.previous-review-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    color: #666;
+    font-size: 0.9em;
+}
+
+.previous-review-content {
+    color: #777;
+    font-style: italic;
+}
+
+.previous-review-rating {
+    color: #FF8C42;
+    font-weight: bold;
+}
+{% endblock %}
+
+{% block content %}
+<div class="review-update-container">
+    <div class="review-card">
+        <div class="product-info">
+            <div class="product-image">
+                <img src="{{ product.image_url }}" 
+                     alt="{{ product.name }}" 
+                     onerror="handleProductImageError(this, '{{ product.category|lower }}')"
+                     loading="lazy">
+            </div>
+            <div class="product-details">
+                <h2>{{ product.name }}</h2>
+                <div class="product-price">${{ "%.2f"|format(product.price) }}</div>
+            </div>
+        </div>
+
+        {% if is_update and review %}
+        <div class="previous-review">
+            <div class="previous-review-header">
+                <span>Your Previous Review ({{ review[4]|datetime }})</span>
+                <span class="previous-review-rating">
+                    {% for i in range(review[3]|int) %}★{% endfor %}
+                    {% for i in range(5 - review[3]|int) %}☆{% endfor %}
+                </span>
+            </div>
+            <div class="previous-review-content">
+                "{{ review[5] }}"
+            </div>
+            {% if review[6] > 0 %}
+            <div style="margin-top: 8px; font-size: 0.9em; color: #666;">
+                {{ review[6] }} people found this review helpful
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <form class="review-form" method="POST" action="{{ url_for('review.submit_review', product_id=product.id) }}">
+            <div class="form-group">
+                <label>Your Rating</label>
+                <div class="rating-group">
+                    {% for i in range(5, 0, -1) %}
+                    <input type="radio" id="star{{ i }}" name="rating" value="{{ i }}"
+                           {% if review and review[3] == i %}checked{% endif %} required>
+                    <label for="star{{ i }}" title="{{ i }} stars">★</label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="comment">Your Review</label>
+                <textarea name="comment" id="comment" 
+                          placeholder="{% if is_update %}Update your thoughts about this product...{% else %}Share your thoughts about this product...{% endif %}" 
+                          required>{{ review[5] if review else '' }}</textarea>
+            </div>
+
+            <div class="button-group">
+                <button type="submit" class="submit-btn">
+                    {% if is_update %}Update{% else %}Submit{% endif %} Review
+                </button>
+                <a href="{{ url_for('user_blueprint.my_reviews') }}" class="cancel-btn">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('.review-form');
+    
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(form);
+        
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                window.location.href = "{{ url_for('user_blueprint.my_reviews') }}";
+            } else {
+                alert(data.error || 'An error occurred while submitting your review.');
+            }
+        })
+        .catch(error => {
+            alert('An error occurred while submitting your review.');
+        });
+    });
+});
+</script>
+{% endblock %} 

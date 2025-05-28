@@ -421,7 +421,9 @@ margin-top: 5px;
 <div class="product-container">
     <div class="product-left">
         <div class="product-image">
-            <img src="{{ product.image_url }}" alt="{{ product.name }}">
+            <img src="{{ product.image_url }}" alt="{{ product.name }}" 
+                 onerror="handleProductImageError(this, '{{ product.category }}')" 
+                 loading="lazy">
         </div>
         <div class="product-details-section">
             <h3>Product Details</h3>
@@ -548,7 +550,10 @@ margin-top: 5px;
             {% for similar_product in similar_products %}
                 <div class="product-slide">
                     <div class="product-image">
-                        <img src="{{ similar_product.image_url }}" alt="{{ similar_product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                        <img src="{{ similar_product.image_url }}" 
+                             alt="{{ similar_product.name }}" 
+                             onerror="handleProductImageError(this, '{{ similar_product.category }}')" 
+                             loading="lazy">
                     </div>
                     <div class="product-info">
                         <h3>{{ similar_product.name }}</h3>
@@ -583,7 +588,10 @@ margin-top: 5px;
             {% for bought_product in bought_together %}
                 <div class="product-slide">
                     <div class="product-image">
-                        <img src="{{ bought_product.image_url }}" alt="{{ bought_product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                        <img src="{{ bought_product.image_url }}" 
+                             alt="{{ bought_product.name }}" 
+                             onerror="handleProductImageError(this, '{{ bought_product.category }}')" 
+                             loading="lazy">
                     </div>
                     <div class="product-info">
                         <h3>{{ bought_product.name }}</h3>
@@ -618,7 +626,10 @@ margin-top: 5px;
             {% for category_product in category_products %}
                 <div class="product-slide">
                     <div class="product-image">
-                        <img src="{{ category_product.image_url }}" alt="{{ category_product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                        <img src="{{ category_product.image_url }}" 
+                             alt="{{ category_product.name }}" 
+                             onerror="handleProductImageError(this, '{{ category_product.category }}')" 
+                             loading="lazy">
                     </div>
                     <div class="product-info">
                         <h3>{{ category_product.name }}</h3>
@@ -653,7 +664,10 @@ margin-top: 5px;
             {% for liked_product in similar_users_liked_products %}
                 <div class="product-slide">
                     <div class="product-image">
-                        <img src="{{ liked_product.image_url }}" alt="{{ liked_product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                        <img src="{{ liked_product.image_url }}" 
+                             alt="{{ liked_product.name }}" 
+                             onerror="handleProductImageError(this, '{{ liked_product.category }}')" 
+                             loading="lazy">
                     </div>
                     <div class="product-info">
                         <h3>{{ liked_product.name }}</h3>
@@ -688,7 +702,10 @@ margin-top: 5px;
             {% for recommended_product in content_based_recommended_products %}
                 <div class="product-slide">
                     <div class="product-image">
-                        <img src="{{ recommended_product.image_url }}" alt="{{ recommended_product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                        <img src="{{ recommended_product.image_url }}" 
+                             alt="{{ recommended_product.name }}" 
+                             onerror="handleProductImageError(this, '{{ recommended_product.category }}')" 
+                             loading="lazy">
                     </div>
                     <div class="product-info">
                         <h3>{{ recommended_product.name }}</h3>
@@ -723,7 +740,10 @@ margin-top: 5px;
             {% for product in new_arrivals %}
                 <div class="product-slide">
                     <div class="product-image">
-                        <img src="{{ product.image_url }}" alt="{{ product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                        <img src="{{ product.image_url }}" 
+                             alt="{{ product.name }}" 
+                             onerror="handleProductImageError(this, '{{ product.category }}')" 
+                             loading="lazy">
                     </div>
                     <div class="product-info">
                         <h3>{{ product.name }}</h3>
@@ -758,7 +778,10 @@ margin-top: 5px;
             {% for product in best_sellers %}
                 <div class="product-slide">
                     <div class="product-image">
-                        <img src="{{ product.image_url }}" alt="{{ product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                        <img src="{{ product.image_url }}" 
+                             alt="{{ product.name }}" 
+                             onerror="handleProductImageError(this, '{{ product.category }}')" 
+                             loading="lazy">
                     </div>
                     <div class="product-info">
                         <h3>{{ product.name }}</h3>
@@ -793,7 +816,10 @@ margin-top: 5px;
             {% for product in seasonal_items %}
                 <div class="product-slide">
                     <div class="product-image">
-                        <img src="{{ product.image_url }}" alt="{{ product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                        <img src="{{ product.image_url }}" 
+                             alt="{{ product.name }}" 
+                             onerror="handleProductImageError(this, '{{ product.category }}')" 
+                             loading="lazy">
                     </div>
                     <div class="product-info">
                         <h3>{{ product.name }}</h3>

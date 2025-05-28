@@ -308,7 +308,7 @@
     box-shadow: 0 6px 15px rgba(255, 61, 0, 0.3);
 }
 
-.write-review-btn {
+.review-btn {
     display: inline-block;
     padding: 12px 20px;
     font-size: 16px;
@@ -324,7 +324,7 @@
     text-align: center;
 }
 
-.write-review-btn:hover {
+.review-btn:hover {
     background: #e0e0e0;
     transform: translateY(-2px);
 }
@@ -359,10 +359,13 @@
                     {% for product in recent_products[:6] %}
                         <div class="product-card">
                             <div class="product-image">
-                                <img src="{{ product.image_url }}" alt="{{ product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                                <img src="{{ product.image_url }}" 
+                                     alt="{{ product.name }}" 
+                                     onerror="handleProductImageError(this, '{{ product.category }}')"
+                                     loading="lazy">
                             </div>
                             <div class="product-info">
-                                <h3>{{ product.name }}</h3>
+                                <h3>{{ product.product_name }}</h3>
                                 <p class="product-price">${{ "%.2f"|format(product.price) }}</p>
                                 <div class="button-container">
                                     <a href="/product/{{ product.product_id }}" class="view-details">View Details</a>
@@ -384,33 +387,34 @@
                     View All <i class="fas fa-arrow-right"></i>
                 </a>
             </div>
-            {% if purchased_products and purchased_products.orders %}
+            {% if purchased_products and purchased_products['orders'] %}
                 <div class="products-grid">
-                    {% set product_count = namespace(value=0) %}
-                    {% for order in purchased_products.orders %}
-                        {% for item in order.items %}
-                            {% if product_count.value < 6 %}
-                                <div class="product-card">
-                                    <div class="product-image">
-                                        <img src="{{ item.image_url }}" alt="{{ item.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                    {% for order in purchased_products['orders'][:2] %}
+                        {% for item in order['items'] %}
+                            <div class="product-card">
+                                <div class="product-image">
+                                    <img src="{{ item['image_url'] }}" 
+                                         alt="{{ item['product_name'] }}" 
+                                         onerror="handleProductImageError(this, '{{ item.category }}')"
+                                         loading="lazy">
+                                </div>
+                                <div class="product-info">
+                                    <h3>{{ item['product_name'] }}</h3>
+                                    <p class="product-price">${{ "%.2f"|format(item['price']) }}</p>
+                                    <div class="purchase-details">
+                                        <span>Qty: {{ item['quantity'] }}</span>
+                                        <span>Total: ${{ "%.2f"|format(item['total_price']) }}</span>
                                     </div>
-                                    <div class="product-info">
-                                        <h3>{{ item.name }}</h3>
-                                        <p class="product-price">${{ "%.2f"|format(item.price) }}</p>
-                                        <div class="purchase-details">
-                                            <span>Qty: {{ item.quantity }}</span>
-                                            <span>Total: ${{ "%.2f"|format(item.total_price) }}</span>
-                                        </div>
-                                        <div class="button-container">
-                                            <a href="/product/{{ item.product_id }}" class="view-details">View Details</a>
-                                            {% if not item.has_review %}
-                                            <a href="/product/{{ item.product_id }}/review" class="write-review-btn">Write a Review</a>
-                                            {% endif %}
-                                        </div>
+                                    <div class="button-container">
+                                        <a href="/product/{{ item['product_id'] }}" class="view-details">View Details</a>
+                                        {% if not item['has_review'] %}
+                                            <a href="{{ url_for('review.review_form', product_id=item['product_id']) }}" class="review-btn">Write a Review</a>
+                                        {% else %}
+                                            <a href="{{ url_for('review.review_form', product_id=item['product_id']) }}" class="review-btn">Update Review</a>
+                                        {% endif %}
                                     </div>
                                 </div>
-                                {% set product_count.value = product_count.value + 1 %}
-                            {% endif %}
+                            </div>
                         {% endfor %}
                     {% endfor %}
                 </div>

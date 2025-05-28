@@ -276,7 +276,7 @@ height: 2.8em;
     transform: translateY(1px);
 }
 
-.write-review-btn {
+.review-btn {
     display: inline-block;
     padding: 12px 20px;
     font-size: 16px;
@@ -292,12 +292,12 @@ height: 2.8em;
     text-align: center;
 }
 
-.write-review-btn:hover {
+.review-btn:hover {
     background: #e0e0e0;
     transform: translateY(-2px);
 }
 
-.write-review-btn:active {
+.review-btn:active {
     transform: translateY(1px);
 }
 
@@ -450,7 +450,10 @@ font-weight: 500;
                             {% for product in order['items'] %}
                             <div class="product-card">
                                 <div class="product-image">
-                                    <img src="{{ product.image_url }}" alt="{{ product.product_name }}" onerror="this.src='/static/images/default-product.jpg'">
+                                    <img src="{{ product.image_url }}" 
+                                         alt="{{ product.product_name }}" 
+                                         onerror="handleProductImageError(this, '{{ product.category|lower }}')"
+                                         loading="lazy">
                                 </div>
                                 <div class="product-info">
                                     <h3>{{ product.product_name }}</h3>
@@ -462,7 +465,9 @@ font-weight: 500;
                                     <div class="button-container">
                                         <a href="/product/{{ product.product_id }}" class="view-details">View Details</a>
                                         {% if not product.has_review %}
-                                        <a href="/product/{{ product.product_id }}/review" class="write-review-btn">Write a Review</a>
+                                            <a href="{{ url_for('review.review_form', product_id=product.product_id) }}" class="review-btn">Write a Review</a>
+                                        {% else %}
+                                            <a href="{{ url_for('review.review_form', product_id=product.product_id) }}" class="review-btn">Update Review</a>
                                         {% endif %}
                                     </div>
                                 </div>
@@ -474,11 +479,13 @@ font-weight: 500;
                 {% endfor %}
             </div>
             <div class="pagination">
-                <button class="pagination-btn" {% if not has_prev %}disabled{% endif %} onclick="changePage({{ page - 1 }})">
+                <button class="pagination-btn" {% if not has_prev %}disabled{% endif %} 
+                        onclick="window.location.href='?page={{ page - 1 }}&date_range={{ date_range }}&sort_by={{ sort_by }}'">
                     Previous
                 </button>
                 <span class="page-info">Page {{ page }} of {{ total_pages }}</span>
-                <button class="pagination-btn" {% if not has_next %}disabled{% endif %} onclick="changePage({{ page + 1 }})">
+                <button class="pagination-btn" {% if not has_next %}disabled{% endif %}
+                        onclick="window.location.href='?page={{ page + 1 }}&date_range={{ date_range }}&sort_by={{ sort_by }}'">
                     Next
                 </button>
             </div>

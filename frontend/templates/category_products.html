@@ -152,7 +152,8 @@
                 <div class="product-image">
                     <img src="{{ product.image_url }}"
                          alt="{{ product.name }}"
-                         onerror="this.src='/static/images/default-product.jpg'">
+                         onerror="handleProductImageError(this, '{{ product.category|lower }}')"
+                         loading="lazy">
                 </div>
                 <div class="product-info">
                     <h3>{{ product.name }}</h3>

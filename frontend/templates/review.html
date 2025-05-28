@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid py-5">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-3 text-primary">{{ product.name }}</h2>
+            <div class="d-flex align-items-center mb-4">
+                <div class="me-3">
+                    <span class="h4 mb-0">{{ "%.1f"|format(product.average_rating|default(0)) }}</span>
+                    <span class="text-muted">/5</span>
+                </div>
+                <div class="stars">
+                    {% for i in range(5) %}
+                    {% if i < (product.average_rating|default(0)|round|int) %}
+                    <i class="fas fa-star text-warning"></i>
+                    {% else %}
+                    <i class="far fa-star text-warning"></i>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                <span class="ms-2 text-muted">({{ reviews|length }} reviews)</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Reviews List - Left Side -->
+        <div class="col-md-7 pe-md-4">
+            <div id="reviewsList" class="reviews-container">
+                {% if reviews %}
+                {% for review in reviews %}
+                <div class="review-card">
+                    <div class="review-header">
+                        <div class="reviewer-info">
+                            <div class="avatar">{{ review.first_name[0] }}</div>
+                            <div>
+                                <h5 class="reviewer-name">{{ review.first_name }}</h5>
+                                <div class="stars">
+                                    {% for i in range(5) %}
+                                    {% if i < review.rating %}
+                                    <i class="fas fa-star text-warning"></i>
+                                    {% else %}
+                                    <i class="far fa-star text-warning"></i>
+                                    {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        <small class="review-date">{{ review.date }}</small>
+                    </div>
+                    <p class="review-content">{{ review.comment }}</p>
+                    {% if review.user_id == session.user_id %}
+                    <div class="review-actions">
+                        <a href="{{ url_for('review.manage_review', product_id=product.id) }}" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                        <form action="{{ url_for('review.delete_review', review_id=review.id) }}" method="POST" class="d-inline">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">
+                                <i class="fas fa-trash-alt"></i> Delete
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="text-center py-5 no-reviews">
+                    <i class="fas fa-comment-alt fa-3x text-muted mb-3"></i>
+                    <h5>No reviews yet</h5>
+                    <p class="text-muted">Be the first to review this product!</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Review Form - Right Side -->
+        <div class="col-md-5">
+            <div class="review-form-container">
+                <div id="alert-container"></div>
+                <div class="form-card">
+                    <h4 class="form-title">{% if user_review %}Edit Your Review{% else %}Write a Review{% endif %}</h4>
+                    <form id="reviewForm" method="POST">
+                        <div class="mb-4">
+                            <label class="form-label">Your Rating</label>
+                            <div class="rating-input">
+                                {% for i in range(5, 0, -1) %}
+                                <input type="radio" id="star{{ i }}" name="rating" value="{{ i }}" 
+                                       {% if user_review and user_review.rating == i %}checked{% endif %} required>
+                                <label for="star{{ i }}"><i class="fas fa-star"></i></label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label for="comment" class="form-label">Your Review</label>
+                            <textarea class="form-control" id="comment" name="comment" rows="4" 
+                                    placeholder="Share your experience with this product..." 
+                                    required>{{ user_review.comment if user_review else '' }}</textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            {{ 'Update Review' if user_review else 'Submit Review' }}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+    :root {
+        --primary-color: #4A90E2;
+        --secondary-color: #F5F7FA;
+        --border-color: #E1E8ED;
+        --text-muted: #8899A6;
+        --success-color: #28A745;
+        --danger-color: #DC3545;
+    }
+
+    .container-fluid {
+        max-width: 1400px;
+    }
+
+    /* Reviews Container Styles */
+    .reviews-container {
+        height: calc(100vh - 250px);
+        overflow-y: auto;
+        padding-right: 15px;
+    }
+
+    .review-card {
+        background: white;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        border: 1px solid var(--border-color);
+    }
+
+    .review-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 15px;
+    }
+
+    .reviewer-info {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .avatar {
+        width: 40px;
+        height: 40px;
+        background: var(--primary-color);
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 1.2em;
+    }
+
+    .reviewer-name {
+        margin: 0;
+        font-size: 1.1em;
+        color: #2C3E50;
+    }
+
+    .review-date {
+        color: var(--text-muted);
+    }
+
+    .review-content {
+        color: #34495E;
+        line-height: 1.6;
+        margin-bottom: 15px;
+    }
+
+    .review-actions {
+        display: flex;
+        gap: 10px;
+    }
+
+    /* Form Styles */
+    .review-form-container {
+        position: sticky;
+        top: 20px;
+    }
+
+    .form-card {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        border: 1px solid var(--border-color);
+    }
+
+    .form-title {
+        color: #2C3E50;
+        margin-bottom: 25px;
+        font-weight: 600;
+    }
+
+    .rating-input {
+        display: flex;
+        flex-direction: row-reverse;
+        justify-content: flex-start;
+        gap: 8px;
+    }
+
+    .rating-input input {
+        display: none;
+    }
+
+    .rating-input label {
+        cursor: pointer;
+        font-size: 2rem;
+        color: #DDE2E5;
+        transition: color 0.2s ease;
+    }
+
+    .rating-input label:hover,
+    .rating-input label:hover ~ label,
+    .rating-input input:checked ~ label {
+        color: #FFC107;
+    }
+
+    .form-control {
+        border: 2px solid var(--border-color);
+        border-radius: 10px;
+        padding: 12px;
+        transition: border-color 0.3s ease;
+    }
+
+    .form-control:focus {
+        border-color: var(--primary-color);
+        box-shadow: none;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border-radius: 10px;
+        transition: all 0.3s ease;
+    }
+
+    .btn-primary {
+        background-color: var(--primary-color);
+        border: none;
+    }
+
+    .btn-primary:hover {
+        background-color: #357ABD;
+        transform: translateY(-1px);
+    }
+
+    .btn-sm {
+        padding: 6px 12px;
+        font-size: 0.875rem;
+    }
+
+    /* Alert Styles */
+    .alert {
+        border-radius: 10px;
+        margin-bottom: 20px;
+        padding: 15px;
+        border: none;
+    }
+
+    /* Scrollbar Styles */
+    .reviews-container::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .reviews-container::-webkit-scrollbar-track {
+        background: var(--secondary-color);
+        border-radius: 4px;
+    }
+
+    .reviews-container::-webkit-scrollbar-thumb {
+        background: #CBD5E0;
+        border-radius: 4px;
+    }
+
+    .reviews-container::-webkit-scrollbar-thumb:hover {
+        background: #A0AEC0;
+    }
+
+    /* No Reviews State */
+    .no-reviews {
+        color: var(--text-muted);
+        background: var(--secondary-color);
+        border-radius: 15px;
+        padding: 40px;
+    }
+
+    .no-reviews i {
+        color: var(--primary-color);
+        opacity: 0.5;
+    }
+
+    /* Responsive Adjustments */
+    @media (max-width: 768px) {
+        .reviews-container {
+            height: auto;
+            margin-bottom: 30px;
+        }
+
+        .review-form-container {
+            position: static;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('reviewForm');
+    const alertContainer = document.getElementById('alert-container');
+
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(form);
+        
+        fetch(window.location.href, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showAlert('success', data.message);
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                showAlert('danger', data.error);
+            }
+        })
+        .catch(error => {
+            showAlert('danger', 'An error occurred while submitting your review.');
+        });
+    });
+
+    function showAlert(type, message) {
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type} alert-dismissible fade show`;
+        alert.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        alertContainer.innerHTML = '';
+        alertContainer.appendChild(alert);
+
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            alert.classList.remove('show');
+            setTimeout(() => alert.remove(), 300);
+        }, 5000);
+    }
+});
+</script>
+{% endblock %} 

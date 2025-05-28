@@ -373,11 +373,12 @@
         // Category click handler
         document.querySelectorAll('.category-list li').forEach(item => {
             item.addEventListener('click', function() {
-                const category = this.textContent.trim();
+                const category = this.textContent.trim().toLowerCase();
                 window.location.href = `/category/${encodeURIComponent(category)}`;
             });
         });
     </script>
     {% block additional_scripts %}{% endblock %}
+    <script src="{{ url_for('static', filename='js/product-defaults.js') }}"></script>
 </body>
 </html> 

@@ -297,6 +297,136 @@
     border-radius: 10px;
     color: #666;
 }
+
+.recommended-section {
+    margin-top: 40px;
+    padding: 20px;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.recommended-section h2 {
+    color: #162938;
+    font-size: 1.5em;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #FF8C42;
+}
+
+.recommended-products {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.recommended-card {
+    background: white;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    height: 350px;
+}
+
+.recommended-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+}
+
+.recommended-card .product-image {
+    width: 100%;
+    height: 150px;
+    overflow: hidden;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.recommended-card .product-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.recommended-card .product-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.recommended-card h3 {
+    font-size: 1.1em;
+    color: #162938;
+    margin: 10px 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    height: 2.8em;
+    line-height: 1.4;
+}
+
+.recommended-card .product-price {
+    color: #00C4FF;
+    font-size: 1.2em;
+    font-weight: bold;
+    margin: 8px 0;
+}
+
+.recommended-card .product-rating {
+    color: #ffcc00;
+    margin: 5px 0;
+    font-size: 0.9em;
+    text-align: center;
+    margin-top: auto;
+    padding-top: 10px;
+}
+
+.recommended-card .button-container {
+    margin-top: 10px;
+}
+
+.recommended-card .view-details {
+    display: inline-block;
+    padding: 12px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    color: white;
+    background: linear-gradient(135deg, #ff7b00, #ff3d00);
+    border: none;
+    border-radius: 25px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.3s ease-in-out;
+    box-shadow: 0 4px 10px rgba(255, 61, 0, 0.2);
+    width: 100%;
+    text-align: center;
+}
+
+.recommended-card .view-details:hover {
+    background: linear-gradient(135deg, #ff3d00, #ff7b00);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(255, 61, 0, 0.3);
+}
+
+.recommended-card .view-details:active {
+    transform: translateY(1px);
+}
+
+.pagination-btn.disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    pointer-events: none;
+    opacity: 0.6;
+}
+{% endblock %}
+
+{% block additional_head %}
+<script src="{{ url_for('static', filename='js/product-defaults.js') }}"></script>
 {% endblock %}
 
 {% block content %}
@@ -339,7 +469,10 @@
                 {% for product in visited_products %}
                     <div class="product-card">
                         <div class="product-image">
-                            <img src="{{ product.image_url }}" alt="{{ product.product_name }}" onerror="this.src='/static/images/default-product.jpg'">
+                            <img src="{{ product.image_url }}" 
+                                 alt="{{ product.product_name }}" 
+                                 onerror="handleProductImageError(this, '{{ product.category }}')"
+                                 loading="lazy">
                         </div>
                         <div class="product-info">
                             <h3>{{ product.product_name }}</h3>
@@ -354,14 +487,49 @@
             </div>
 
             <div class="pagination">
-                <button class="pagination-btn" {% if not has_prev %}disabled{% endif %} onclick="changePage({{ page - 1 }})">
+                <a href="{% if has_prev %}?page={{ page - 1 }}&date_range={{ date_range }}&sort_by={{ sort_by }}{% else %}#{% endif %}" 
+                   class="pagination-btn {% if not has_prev %}disabled{% endif %}"
+                   {% if not has_prev %}onclick="return false;"{% endif %}>
                     Previous
-                </button>
+                </a>
                 <span class="page-info">Page {{ page }} of {{ total_pages }}</span>
-                <button class="pagination-btn" {% if not has_next %}disabled{% endif %} onclick="changePage({{ page + 1 }})">
+                <a href="{% if has_next %}?page={{ page + 1 }}&date_range={{ date_range }}&sort_by={{ sort_by }}{% else %}#{% endif %}" 
+                   class="pagination-btn {% if not has_next %}disabled{% endif %}"
+                   {% if not has_next %}onclick="return false;"{% endif %}>
                     Next
-                </button>
+                </a>
             </div>
+
+            {% if recommended_products %}
+            <div class="recommended-section" id="recommended-section">
+                <h2>Recommended Based on Your Views</h2>
+                <div class="recommended-products">
+                    {% for product in recommended_products %}
+                        <div class="recommended-card">
+                            <div class="product-image">
+                                <img src="{{ product.image_url }}" 
+                                     alt="{{ product.name }}" 
+                                     onerror="handleProductImageError(this, '{{ product.category }}')"
+                                     loading="lazy">
+                            </div>
+                            <div class="product-info">
+                                <h3>{{ product.name }}</h3>
+                                <p class="product-price">${{ "%.2f"|format(product.price) }}</p>
+                                {% if product.rating %}
+                                <div class="product-rating">
+                                    {% for i in range(product.rating|int) %}★{% endfor %}
+                                    {% for i in range(5 - product.rating|int) %}☆{% endfor %}
+                                </div>
+                                {% endif %}
+                                <div class="button-container">
+                                    <a href="/product/{{ product.id }}" class="view-details">View Details</a>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
         {% else %}
             <div class="no-visits">
                 <h3>No visited products found</h3>
@@ -434,12 +602,6 @@
 <script>
 function clearFilters() {
     window.location.href = window.location.pathname;
-}
-
-function changePage(page) {
-    const urlParams = new URLSearchParams(window.location.search);
-    urlParams.set('page', page);
-    window.location.search = urlParams.toString();
 }
 </script>
 {% endblock %} 

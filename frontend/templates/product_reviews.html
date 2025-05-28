@@ -44,7 +44,11 @@
 }
 
 .review-rating {
-    color: #ffa41c;
+    color: #ddd;  /* Default color for unfilled stars */
+}
+
+.review-rating .filled {
+    color: #ffa41c;  /* Color for filled stars */
 }
 
 .review-date {
@@ -154,7 +158,12 @@
 {% block content %}
 <div class="reviews-container">
     <div class="product-summary">
-        <img src="{{ product.image_url }}" alt="{{ product.name }}">
+        <div class="product-image">
+            <img src="{{ product.image_url }}" 
+                 alt="{{ product.name }}" 
+                 onerror="handleProductImageError(this, '{{ product.category|lower }}')"
+                 loading="lazy">
+        </div>
         <h2>{{ product.name }}</h2>
         <p class="product-price">${{ "%.2f"|format(product.price) }}</p>
         <button class="add-to-cart" onclick="addToCart('{{ product.id }}', 1)">Add to Cart</button>
@@ -194,7 +203,9 @@
             {% for product in review_based_reccs %}
                 <div class="product-slide">
                     <div class="product-image">
-                        <img src="{{ product.image_url }}" alt="{{ product.name }}" onerror="this.src='/static/images/default-product.jpg'">
+                        <img src="{{ product.image_url }}" alt="{{ product.name }}" 
+                             onerror="handleProductImageError(this, '{{ product.category|lower }}')"
+                             loading="lazy">
                     </div>
                     <div class="product-info">
                         <h3>{{ product.name }}</h3>

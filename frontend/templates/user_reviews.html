@@ -141,6 +141,52 @@
     font-size: 0.9em;
 }
 
+.review-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+.review-btn {
+    flex: 1;
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 0.9em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+
+.update-btn {
+    background: #f0f0f0;
+    color: #162938;
+    border: none;
+}
+
+.update-btn:hover {
+    background: #162938;
+    color: white;
+}
+
+.delete-btn {
+    background: #fff0f0;
+    color: #dc3545;
+    border: none;
+}
+
+.delete-btn:hover {
+    background: #dc3545;
+    color: white;
+}
+
 .filter-section {
     background: white;
     padding: 20px;
@@ -223,6 +269,9 @@
     color: #ff3d00;
 }
 {% endblock %}
+{% block additional_head %}
+<script src="{{ url_for('static', filename='js/product-defaults.js') }}"></script>
+{% endblock %}
 
 {% block content %}
 <div class="profile-layout">
@@ -264,9 +313,11 @@
             {% if reviews %}
                 {% for review in reviews %}
                     <div class="col-md-6 mb-4">
-                        <div class="review-card">
-                            <img src="{{ review.image_url }}" alt="{{ review.product_name }}" 
-                                 onerror="this.src='/static/images/default-product.jpg'">
+                        <div class="review-card" id="review-{{ review.review_id }}">
+                            <img src="{{ review.image_url }}" 
+                                 alt="{{ review.product_name }}" 
+                                 onerror="handleProductImageError(this, '{{ review.category }}')"
+                                 loading="lazy">
                             <div class="card-body">
                                 <h5 class="card-title">{{ review.product_name }}</h5>
                                 <div class="rating">
@@ -278,7 +329,7 @@
                                         {% endif %}
                                     {% endfor %}
                                 </div>
-                                <p class="card-text">{{ review.review_text }}</p>
+                                <p class="card-text">{{ review.comment }}</p>
                                 <p class="review-date">Reviewed on {{ review.review_date }}</p>
                                 {% if review.order_id %}
                                     <div class="order-info">
@@ -287,6 +338,16 @@
                                         <p class="mb-0">Total: ${{ "%.2f"|format(review.total_amount) }}</p>
                                     </div>
                                 {% endif %}
+                                <div class="review-actions">
+                                    <a href="{{ url_for('review.review_form', product_id=review.product_id) }}"
+                                       class="review-btn update-btn">
+                                        <i class="fas fa-edit"></i> Update
+                                    </a>
+                                    <button onclick="deleteReview('{{ review.product_id }}', '{{ review.review_id }}')" 
+                                            class="review-btn delete-btn">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -352,7 +413,11 @@
                 {% for item in recommended_items %}
                 <div class="col-md-4 col-lg-3 mb-4">
                     <div style="background: white; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.10); overflow: hidden; display: flex; flex-direction: column; height: 100%; transition: box-shadow 0.3s;">
-                        <img src="{{ item.image_url or '/static/images/default-product.jpg' }}" alt="{{ item.name }}" style="width: 100%; height: 200px; object-fit: cover;">
+                        <img
+                                src="{{ item.image_url }}"
+                                onerror="handleProductImageError(this, '{{ item.category }}')"
+                                alt="{{ item.name }}"
+                                style="width: 100%; height: 200px; object-fit: cover;">
                         <div style="padding: 18px 16px 16px 16px; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
                             <h5 style="font-size: 1.1em; color: #162938; margin-bottom: 10px; min-height: 2.4em;">{{ item.name }}</h5>
                             <p style="color: #00C4FF; font-size: 1.15em; font-weight: bold; margin-bottom: 16px;">${{ "%.2f"|format(item.price) }}</p>
@@ -430,6 +495,55 @@
 <script>
 function clearFilters() {
     window.location.href = window.location.pathname;
+}
+
+function deleteReview(productId, reviewId) {
+    if (!confirm('Are you sure you want to delete this review?')) {
+        return;
+    }
+
+    fetch(`/product/${productId}/reviews/delete`, {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            // Remove the review card from the DOM
+            const reviewCard = document.getElementById(`review-${reviewId}`);
+            reviewCard.parentElement.remove();
+
+            // Show success message
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success';
+            alertDiv.innerHTML = '<i class="fas fa-check-circle me-2"></i>' + data.message;
+            document.querySelector('.profile-header').insertAdjacentElement('afterend', alertDiv);
+
+            // Remove the alert after 3 seconds
+            setTimeout(() => alertDiv.remove(), 3000);
+
+            // If no more reviews, show the "no reviews" message
+            const reviewsContainer = document.querySelector('.row');
+            if (!reviewsContainer.querySelector('.review-card')) {
+                reviewsContainer.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            You haven't written any reviews yet.
+                        </div>
+                    </div>
+                `;
+            }
+        } else {
+            alert(data.error || 'An error occurred while deleting the review.');
+        }
+    })
+    .catch(error => {
+        alert('An error occurred while deleting the review.');
+    });
 }
 </script>
 {% endblock %} 
