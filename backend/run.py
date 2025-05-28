@@ -15,6 +15,7 @@ from app.controllers.cart_wishlist_controller import cart_wishlist_controller_bl
 from app.controllers.order_controller import order_bp
 from redis_app.controllers.redis_controller import redis_main_controller_blueprint
 from app.controllers.main_controller import main_controller_blueprint
+from app.controllers.review_controller import review_bp
 from app.services.service_locator import tracking_service
 from config import JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES
 
@@ -80,6 +81,7 @@ if __name__ == '__main__':
     #app.register_blueprint(merchant_controller_blueprint)
     app.register_blueprint(cart_wishlist_controller_blueprint)
     app.register_blueprint(order_bp)
+    app.register_blueprint(review_bp)
     app.register_blueprint(redis_main_controller_blueprint)
 
     # Error handlers
