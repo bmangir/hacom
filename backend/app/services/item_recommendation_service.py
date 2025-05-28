@@ -242,6 +242,7 @@ class ItemRecommendationService:
         return result
 
     def get_products_by_category(self, category: str, num_recommendations: int = 20):
+        category = category.title()
         if category == "Fashion":
             category = "Clothing"
         elif category == "Electronics":
@@ -295,71 +296,3 @@ class ItemRecommendationService:
         except Exception as e:
             print(f"Error getting merchant details: {str(e)}")
             return None
-
-    def get_product_details(self, product_id: str):
-        # Try to get from cache first
-        cached_item = self.cache.get_item_recommendations(product_id, "details")
-        if cached_item:
-            return cached_item[0]  # Return first item since it's a single product
-
-        # If not in cache, get from MongoDB
-        item = _get_product_details([product_id])[0]
-
-        if item:
-            self.cache.set_item_recommendations(product_id, [item], "details")
-
-        return item
-
-    def get_product_reviews(self, product_id: str):
-        """Get reviews for a product with user details."""
-        # Try to get from cache first
-        cached_reviews = self.cache.get_item_recommendations(product_id, "reviews")
-        if cached_reviews:
-            return cached_reviews
-
-        conn = None
-        cursor = None
-        try:
-            conn = NeonPostgresConnector.get_connection()
-            cursor = conn.cursor()
-
-            # Get reviews with user information
-            review_query = """
-                SELECT r.review_id, r.rating, r.review_text, r.review_date, r.review_helpful_count,
-                       u.first_name, u.last_name
-                FROM product_reviews r
-                JOIN users u ON r.user_id = u.user_id
-                WHERE r.product_id = %s
-                ORDER BY r.review_date DESC
-            """
-            cursor.execute(review_query, [product_id])
-            reviews = cursor.fetchall()
-
-            # Format reviews
-            formatted_reviews = []
-            for review in reviews:
-                review_id, rating, comment, review_date, helpful_count, first_name, last_name = review
-                formatted_reviews.append({
-                    'review_id': review_id,
-                    'rating': rating,
-                    'comment': comment,
-                    'date': review_date,
-                    'helpful_count': helpful_count or 0,
-                    'first_name': first_name,
-                    'last_name': last_name
-                })
-
-            # Cache the results
-            if formatted_reviews:
-                self.cache.set_item_recommendations(product_id, formatted_reviews, "reviews")
-
-            return formatted_reviews
-
-        except Exception as e:
-            print(f"Error getting product reviews: {str(e)}")
-            return []
-        finally:
-            if cursor:
-                cursor.close()
-            if conn:
-                NeonPostgresConnector.return_connection(conn)

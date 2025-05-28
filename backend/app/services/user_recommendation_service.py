@@ -1,4 +1,5 @@
 import os
+import re
 import time
 from datetime import datetime, timedelta
 
@@ -157,27 +158,34 @@ class UserRecommendationService:
         if cached_products:
             return cached_products[:limit]  # Return only requested number of items
 
+        """Get recently viewed products for a user."""
         try:
             browsing_collection = client[MONGO_BROWSING_DB]['browsing_history']
-            products_collection = client[MONGO_PRODUCTS_DB]['products']
 
-            # Get recent product views directly with sort and limit
-            recent_views = list(browsing_collection.find(
+            cursor = browsing_collection.find(
                 {
                     'user_id': user_id,
-                    'page_url': {'$regex': '/product/'}
+                    'page_url': {'$regex': '(/product/|/products/details/)'}
                 },
-                {'page_url': 1, 'timestamp': 1}
-            ).sort('timestamp', -1).limit(limit))
+                {'_id': 0, 'page_url': 1, 'timestamp': 1}
+            ).sort('timestamp', -1).limit(limit * 2)  # limit*2: to avoid for same product
 
-            # Extract product IDs and get product details
-            products = []
-            for view in recent_views:
-                product_id = view['page_url'].split('/')[-1]
-                product = products_collection.find_one({'product_id': product_id}, {'_id': 0})
-                if product:
-                    product['last_visit_date'] = datetime.fromtimestamp(view['timestamp']).strftime('%Y-%m-%d %H:%M:%S')
-                    products.append(product)
+            product_ids = []
+            seen = set()
+
+            for doc in cursor:
+                match = re.search(r'/product/([^/?#]+)|/products/details/([^/?#]+)', doc['page_url'])
+                if match:
+                    # Get the product ID from whichever group matched (first or second)
+                    pid = match.group(1) if match.group(1) else match.group(2)
+                    if pid not in seen:
+                        if not (pid is None or pid == 'None'):
+                            seen.add(pid)
+                            product_ids.append(pid)
+                if len(product_ids) >= limit:
+                    break
+
+            products = _get_product_details(product_ids)
 
             # Cache the results
             if products:

@@ -144,10 +144,15 @@ def profile():
 
     try:
         # Get recently visited products
-        recent_products = USER_RECOMMENDATION_SERVICE.get_recently_viewed_products(user_id, limit=10)
+        recent_products_result = user_service.get_visited_products(user_id=user_id)
+        recent_products = recent_products_result.get('products', [])[:10] if recent_products_result else []
 
         # Get purchased products
-        purchased_products = USER_RECOMMENDATION_SERVICE.get_purchased_products(user_id)
+        purchased_products_result = user_service.get_purchased_products(user_id)
+        purchased_products = purchased_products_result if purchased_products_result else {'orders': [], 'total': 0}
+
+        print(f"Recent Products: {recent_products}")
+        print(f"Purchased Products: {purchased_products}")
 
         return render_template(
             "user_profile.html",
@@ -159,7 +164,7 @@ def profile():
         return render_template(
             "user_profile.html",
             recent_products=[],
-            purchased_products=[]
+            purchased_products={'orders': [], 'total': 0}
         )
 
 
@@ -189,6 +194,9 @@ def all_visits():
         has_prev = page > 1
         has_next = page < total_pages
 
+        # Get recommended items based on recently viewed products
+        recc_items_based_recently_viewed = USER_RECOMMENDATION_SERVICE.get_recently_viewed_based_recommendations(user_id, 8)
+
         return render_template(
             "user_all_visits.html",
             visited_products=visited_products.get('products', []),
@@ -197,7 +205,8 @@ def all_visits():
             has_prev=has_prev,
             has_next=has_next,
             date_range=date_range,
-            sort_by=sort_by
+            sort_by=sort_by,
+            recommended_products=recc_items_based_recently_viewed
         )
     except Exception as e:
         print(f"Error loading visited products: {str(e)}")
@@ -209,7 +218,8 @@ def all_visits():
             has_prev=False,
             has_next=False,
             date_range='all',
-            sort_by='recent'
+            sort_by='recent',
+            recommended_products=[]
         )
 
 
@@ -262,40 +272,6 @@ def all_purchases():
             sort_by='recent',
             active_page='purchases'
         )
-
-
-@user_blueprint.route('/visited-products', methods=['GET'])
-@login_required
-def get_visited_products():
-    """Get visited products with filtering and pagination."""
-    try:
-        user_id = session.get('user_id')
-        date_range = request.args.get('date_range', 'all')
-        sort_by = request.args.get('sort_by', 'recent')
-        page = int(request.args.get('page', 1))
-        per_page = int(request.args.get('per_page', 12))
-
-        result = user_service.get_visited_products(
-            user_id=user_id,
-            date_range=date_range,
-            sort_by=sort_by,
-            page=page,
-            per_page=per_page
-        )
-
-        total = result['total']
-        total_pages = math.ceil(total / per_page)
-
-        return jsonify({
-            'products': result['products'],
-            'total': total,
-            'total_pages': total_pages,
-            'current_page': page
-        })
-
-    except Exception as e:
-        print(f"Error loading visited products: {str(e)}")
-        return jsonify({'error': str(e)}), 500
 
 
 @user_blueprint.route("/my-reviews")

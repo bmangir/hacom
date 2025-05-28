@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for
 from . import login_required
 from ..services.service_locator import ITEM_RECOMMENDATION_SERVICE, tracking_service, wishlist_service, \
-    USER_RECOMMENDATION_SERVICE
+    USER_RECOMMENDATION_SERVICE, review_service, PRODUCT_SERVICE
 import time
 
 product_controller_blueprint = Blueprint('product_controller_blueprint', __name__)
@@ -29,7 +29,7 @@ def display_details(product_id):
         # Update last page time
         session['last_page_time'] = current_time
 
-        product = ITEM_RECOMMENDATION_SERVICE.get_product_details(product_id)
+        product = PRODUCT_SERVICE.get_product_details(product_id)
         if not product:
             return "Product not found", 404
 
@@ -37,7 +37,7 @@ def display_details(product_id):
         in_wishlist = wishlist_service.is_in_wishlist(user_id, product_id)
 
         # Get top 5 reviews
-        all_reviews = ITEM_RECOMMENDATION_SERVICE.get_product_reviews(product_id)
+        all_reviews = review_service.get_product_reviews(product_id)
         reviews = all_reviews[:5] if all_reviews else []
         total_reviews = len(all_reviews)
 
@@ -73,30 +73,6 @@ def display_details(product_id):
         print(f"Error viewing product: {str(e)}")
         return "Error loading product", 500
 
-
-@product_controller_blueprint.route("/product/<product_id>/reviews")
-@login_required
-def display_reviews(product_id):
-    """Show all reviews for a product"""
-    try:
-        product = ITEM_RECOMMENDATION_SERVICE.get_product_details(product_id)
-        if not product:
-            return "Product not found", 404
-
-        # Get all reviews
-        reviews = ITEM_RECOMMENDATION_SERVICE.get_product_reviews(product_id)
-        review_based_reccs = ITEM_RECOMMENDATION_SERVICE.get_reviewed_based_items()
-
-        return render_template(
-            "product_reviews.html",
-            product=product,
-            reviews=reviews,
-            review_based_reccs=review_based_reccs
-        )
-
-    except Exception as e:
-        print(f"Error loading reviews: {str(e)}")
-        return "Error loading reviews", 500
 
 
 @product_controller_blueprint.route("/search")

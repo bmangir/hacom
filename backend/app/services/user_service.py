@@ -254,7 +254,6 @@ class UserService:
         conn = None
         cursor = None
         try:
-            # Connect to PostgreSQL
             conn = NeonPostgresConnector.get_connection()
             cursor = conn.cursor()
 
@@ -262,10 +261,15 @@ class UserService:
             select_clause = """
                 SELECT r.review_id, r.product_id, r.rating, r.review_text, r.review_date,
                        o.order_id, o.quantity, o.total_amount
-                FROM product_reviews r
+                FROM (
+                    SELECT *,
+                           ROW_NUMBER() OVER (PARTITION BY product_id ORDER BY review_date DESC) AS rn
+                    FROM product_reviews
+                    WHERE user_id = %s AND action_type != 'deleted'
+                ) AS r
                 LEFT JOIN orders o ON r.product_id = o.product_id AND r.user_id = o.user_id
             """
-            where_clause = "WHERE r.user_id = %s"
+            where_clause = "WHERE r.rn = 1"
             params = [user_id]
 
             # Apply date range filter
@@ -313,17 +317,19 @@ class UserService:
                         'review_id': review_id,
                         'rating': rating,
                         'comment': comment,
-                        'review_date': time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(review_date / 1000)),
+                        'review_date': review_date,
                         'order_id': order_id,
                         'quantity': quantity,
+                        'category': product.category,
                         'total_amount': float(total_amount) if total_amount else None
                     })
                     result_reviews.append(review_data)
 
             # Get total count for pagination
-            count_query = f"SELECT COUNT(*) FROM product_reviews r {where_clause}"
-            cursor.execute(count_query, [user_id])
-            total_count = cursor.fetchone()[0]
+            #count_query = f"SELECT COUNT(*) FROM product_reviews r {where_clause}"
+            #cursor.execute(count_query, [user_id])
+            #total_count = cursor.fetchone()[0]
+            total_count = len(result_reviews)
 
             return {'reviews': result_reviews, 'total': total_count}
 

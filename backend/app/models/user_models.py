@@ -65,7 +65,7 @@ class PersonalizedTrending(Document):
 class RecentlyViewed(Document):
     meta = {
         'db_alias': 'recc_default',
-        'collection': 'recently_viewed'
+        'collection': 'recently_viewed_based'
     }
 
     user_id = StringField(required=True)

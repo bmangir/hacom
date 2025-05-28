@@ -1,6 +1,8 @@
 from backend.app.services.cart_service import CartService
 from backend.app.services.item_recommendation_service import ItemRecommendationService
 from backend.app.services.order_service import OrderService
+from backend.app.services.product_service import ProductService
+from backend.app.services.review_service import ReviewService
 from backend.app.services.session_service import SessionService
 from backend.app.services.user_recommendation_service import UserRecommendationService
 from backend.app.services.tracking_service import TrackingService
@@ -38,6 +40,9 @@ USER_RECOMMENDATION_SERVICE = UserRecommendationService(
     mongo_db=mongo_db,
     cache=redis_cache
 )
+
+review_service = ReviewService(cache=redis_cache)
+PRODUCT_SERVICE = ProductService(cache=redis_cache)
 
 # Initialize other services
 tracking_service = TrackingService()

@@ -98,21 +98,8 @@ class WishlistService:
             """, (user_id,))
             try:
                 items = cursor.fetchall()
-                #items_list = [{"wishlist_id": item[0], "product_id": item[1], "action_date": item[2]} for item in items]
                 item_ids = [item[1] for item in items]
-
                 wishlist_items = _get_product_details(item_ids)
-
-                #if client:
-                #    products_coll = client[MONGO_PRODUCTS_DB]["products"]
-#
-                #    for item in items_list:
-                #        product = products_coll.find_one({"product_id": item["product_id"]},
-                #                                      {"_id": 0, "product_name": 1, "price": 1, "category": 1})
-                #        if product:
-                #            item["product_name"] = product.get("product_name")
-                #            item["price"] = product.get("price")
-                #            item["category"] = product.get("category")
 
                 return {"success": True, "items": wishlist_items}
 
@@ -254,10 +241,6 @@ class WishlistService:
                 # Track each removed item
                 for item in wishlist_items:
                     wishlist_id, product_id = item
-
-                    # Get product details
-                    #product = products_coll.find_one({"product_id": product_id},
-                    #                              {"_id": 0, "product_name": 1, "price": 1, "category": 1})
                     product = ProductDetails.objects(product_id=product_id)
 
                     # Send wishlist item remove event to Kafka for each product
