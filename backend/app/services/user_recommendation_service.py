@@ -11,27 +11,10 @@ from backend.utils.utils import _get_product_details
 from backend.config import client, MONGO_BROWSING_DB, MONGO_URI, MONGO_PRODUCTS_DB
 from databases.postgres.neon_postgres_connector import NeonPostgresConnector
 
-
-os.environ[
-    'PYSPARK_SUBMIT_ARGS'] = '--packages org.postgresql:postgresql:42.6.0,org.mongodb.spark:mongo-spark-connector_2.12:10.3.0 pyspark-shell --driver-memory 4g pyspark-shell'
-
-spark = SparkSession.builder \
-    .appName("MongoDBBrowsingHistory") \
-    .master("local[*]") \
-    .config("spark.mongodb.read.connection.uri", MONGO_URI) \
-    .config("spark.mongodb.write.connection.uri", MONGO_URI) \
-    .config("spark.jars.packages", "org.mongodb.spark:mongo-spark-connector_2.12:10.1.1") \
-    .getOrCreate()
-
 class UserRecommendationService:
     def __init__(self, mongo_db, cache):
         self.db = mongo_db
         self.cache = cache
-        self.user_browsing_history = spark.read \
-            .format("mongodb") \
-            .option("database", MONGO_BROWSING_DB) \
-            .option("collection", "browsing_history") \
-            .load()
             
         # Create indexes for better performance
         try:
