@@ -124,11 +124,3 @@ class KafkaProducerUtil:
 
 
 kafka_producer_util = KafkaProducerUtil()
-
-#test_event = kafka_producer_util.format_interaction_event(
-#    user_id="testUserBerkantM",
-#    product_id="test_product_456",
-#    event_type="test_view",
-#    details={"test_page": "home", "test_action": "view"}
-#)
-#kafka_producer_util.send_event(test_event)
