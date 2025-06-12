@@ -62,7 +62,7 @@ class TrackingService:
             )
             
             # Send to Kafka
-            # kafka_producer_util.send_event(kafka_event)
+            kafka_producer_util.send_event(kafka_event)
             
             return {"success": True, "id": str(result.inserted_id)}
             
@@ -117,7 +117,7 @@ class TrackingService:
             )
             
             # Send to Kafka
-            #kafka_producer_util.send_event(kafka_event)
+            kafka_producer_util.send_event(kafka_event)
                     
             return {"success": True, "id": str(result.inserted_id)}
             
