@@ -6,21 +6,24 @@ import sys
 import time
 from flask_cors import CORS
 
+# Add the backend directory to the Python path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+backend_dir = os.path.dirname(current_dir)
+sys.path.append(backend_dir)
+
 from databases.postgres.neon_postgres_connector import NeonPostgresConnector
 
-from app.controllers.user_controller import user_blueprint
-from app.controllers.product_controller import product_controller_blueprint
-from app.controllers.merchant_controller import merchant_controller_blueprint
-from app.controllers.cart_wishlist_controller import cart_wishlist_controller_blueprint
-from app.controllers.order_controller import order_bp
-from redis_app.controllers.redis_controller import redis_main_controller_blueprint
-from app.controllers.main_controller import main_controller_blueprint
-from app.controllers.review_controller import review_bp
-from app.services.service_locator import tracking_service
-from config import JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES
+from backend.app.controllers.user_controller import user_blueprint
+from backend.app.controllers.product_controller import product_controller_blueprint
+from backend.app.controllers.merchant_controller import merchant_controller_blueprint
+from backend.app.controllers.cart_wishlist_controller import cart_wishlist_controller_blueprint
+from backend.app.controllers.order_controller import order_bp
+from backend.redis_app.controllers.redis_controller import redis_main_controller_blueprint
+from backend.app.controllers.main_controller import main_controller_blueprint
+from backend.app.controllers.review_controller import review_bp
+from backend.app.services.service_locator import tracking_service
+from backend.config import JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES
 
-# Add the app directory to the Python path
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'app'))
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 try:
@@ -41,37 +44,7 @@ def create_app():
     # Enable CORS
     CORS(app)
 
-    return app
-
-
-app = create_app()
-
-
-@app.before_request
-def track_request():
-    """Track every request to track user browsing."""
-    if 'user_id' in session:
-        current_time = time.time()
-        last_page_time = session.get('last_page_time')
-
-        # Use the global tracking_service
-        tracking_service.track_browsing_history(
-            user_id=session['user_id'],
-            session_id=session.get('session_id'),
-            page_url=request.path,
-            referrer_url=request.referrer,
-            last_page_time=last_page_time
-        )
-
-        session['last_page_time'] = current_time
-
-
-@app.route('/static/<path:path>')
-def send_static(path):
-    return send_from_directory('../frontend/static', path)
-
-
-if __name__ == '__main__':
+    # Initialize JWT
     jwt = JWTManager(app)
 
     # Register blueprints
@@ -84,6 +57,28 @@ if __name__ == '__main__':
     app.register_blueprint(review_bp)
     app.register_blueprint(redis_main_controller_blueprint)
 
+    @app.before_request
+    def track_request():
+        """Track every request to track user browsing."""
+        if 'user_id' in session:
+            current_time = time.time()
+            last_page_time = session.get('last_page_time')
+
+            # Use the global tracking_service
+            tracking_service.track_browsing_history(
+                user_id=session['user_id'],
+                session_id=session.get('session_id'),
+                page_url=request.path,
+                referrer_url=request.referrer,
+                last_page_time=last_page_time
+            )
+
+            session['last_page_time'] = current_time
+
+    @app.route('/static/<path:path>')
+    def send_static(path):
+        return send_from_directory('../frontend/static', path)
+
     # Error handlers
     @app.errorhandler(404)
     def page_not_found(e):
@@ -93,4 +88,11 @@ if __name__ == '__main__':
     def internal_server_error(e):
         return "500 Error"
 
-    app.run(host="127.0.0.1", port=8080, debug=True)
+    return app
+
+app = create_app()
+
+if __name__ == '__main__':
+    # Get port from environment variable or default to 10000 (Render.com uses PORT env variable)
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
