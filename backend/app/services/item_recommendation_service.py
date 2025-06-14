@@ -1,13 +1,10 @@
 from sentence_transformers import SentenceTransformer
 import google.generativeai as genai
-import time
 
 from backend.app.models.item_models import IBCF, BestSellers, NewArrivals, SeasonalRecc, Trending, ReviewedBased, \
     TrendingCategories
-from backend.app.models.user_models import ProductDetails
 from backend.utils.utils import _get_product_details
 from backend.config import pc, ITEM_CONTENTS_HOST, client, MONGO_PRODUCTS_DB, GEMINI_API_KEY
-from databases.postgres.neon_postgres_connector import NeonPostgresConnector
 
 
 class ItemRecommendationService:

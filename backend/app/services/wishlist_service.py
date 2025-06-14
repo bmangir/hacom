@@ -3,7 +3,6 @@ from datetime import datetime
 
 from backend.app.models.user_models import ProductDetails
 from databases.postgres.neon_postgres_connector import NeonPostgresConnector
-from backend.config import MONGO_PRODUCTS_DB, client
 from backend.utils.utils import kafka_producer_util, _get_product_details
 
 

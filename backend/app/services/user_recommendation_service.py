@@ -1,14 +1,11 @@
-import os
 import re
 import time
 from datetime import datetime, timedelta
 
-from pyspark.sql import SparkSession
-
 from backend.app.models.user_models import UBCF, ContentBased, PersonalizedTrending, RecentlyViewed, \
     CategoryRecommendation
 from backend.utils.utils import _get_product_details
-from backend.config import client, MONGO_BROWSING_DB, MONGO_URI, MONGO_PRODUCTS_DB
+from backend.config import client, MONGO_BROWSING_DB, MONGO_PRODUCTS_DB
 from databases.postgres.neon_postgres_connector import NeonPostgresConnector
 
 class UserRecommendationService:

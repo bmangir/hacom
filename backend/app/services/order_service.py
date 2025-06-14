@@ -3,8 +3,6 @@ from datetime import datetime
 import uuid
 
 from backend.app.models.user_models import ProductDetails
-from backend.config import MONGO_PRODUCTS_DB, client
-from databases.mongo.mongo_connector import MongoConnector
 from databases.postgres.neon_postgres_connector import NeonPostgresConnector
 from backend.utils.utils import kafka_producer_util
 

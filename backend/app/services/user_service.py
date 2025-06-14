@@ -1,14 +1,12 @@
 import re
 import time
-import json
 
-import pandas as pd
 from datetime import datetime, timedelta
 
 from backend.app.models.user_models import ProductDetails
 from backend.config import MONGO_BROWSING_DB, MONGO_PRODUCTS_DB, client
 from backend.utils.utils import _get_product_details
-from databases.mongo.mongo_connector import MongoConnector
+
 from databases.postgres.neon_postgres_connector import NeonPostgresConnector
 
 

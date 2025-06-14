@@ -2,8 +2,7 @@ import time
 from datetime import datetime
 
 from backend.app.models.user_models import ProductDetails
-from backend.config import MONGO_PRODUCTS_DB, client
-from databases.mongo.mongo_connector import MongoConnector
+from backend.config import client
 from databases.postgres.neon_postgres_connector import NeonPostgresConnector
 from backend.utils.utils import kafka_producer_util
 
