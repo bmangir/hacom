@@ -15,4 +15,5 @@ sentence-transformers~=2.5.1
 psycopg2-binary~=2.9.9
 user-agents~=2.2.0
 gunicorn
+uvicorn[standard]
 confluent_kafka
