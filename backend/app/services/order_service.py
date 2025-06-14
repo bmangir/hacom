@@ -80,7 +80,7 @@ class OrderService:
                     event_type="purchase",
                     details=purchase_details
                 )
-                #kafka_producer_util.send_event(purchase_event)
+                kafka_producer_util.send_event(purchase_event)
 
             # Commit the transaction
             conn.commit()
@@ -103,7 +103,7 @@ class OrderService:
                 event_type="order_completed",
                 details=order_completed_details
             )
-            #kafka_producer_util.send_event(order_event)
+            kafka_producer_util.send_event(order_event)
 
             return {
                 'order_id': order_id,
@@ -258,7 +258,7 @@ class OrderService:
                 event_type="order_status_updated",
                 details=status_details
             )
-            #kafka_producer_util.send_event(status_event)
+            kafka_producer_util.send_event(status_event)
 
             return True
 

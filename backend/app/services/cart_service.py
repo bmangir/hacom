@@ -2,7 +2,7 @@ import time
 from datetime import datetime
 
 from backend.app.models.user_models import ProductDetails
-from backend.config import client
+from backend.config import client, MONGO_PRODUCTS_DB
 from databases.postgres.neon_postgres_connector import NeonPostgresConnector
 from backend.utils.utils import kafka_producer_util
 
@@ -11,6 +11,7 @@ class CartService:
     @staticmethod
     def add_to_cart(user_id, product_id, session_id, quantity=1):
         """Add a product to the user's cart or update quantity if exists."""
+        temp_quantity = quantity
 
         conn = None
         cursor = None
@@ -18,7 +19,7 @@ class CartService:
             conn = NeonPostgresConnector.get_connection()
             cursor = conn.cursor()
 
-            #products_coll = client[MONGO_PRODUCTS_DB]["products"]
+            products_coll = client[MONGO_PRODUCTS_DB]["products"]
 
             cursor.execute("""
                 SELECT quantity, cart_id
@@ -26,10 +27,7 @@ class CartService:
                 WHERE user_id = %s AND product_id = %s AND action_type = 'removed';
             """, (user_id, product_id))
             cart_item = cursor.fetchone()
-            
-            # Get product details for Kafka event
-            #product = products_coll.find_one({"product_id": product_id},
-            #                                {"_id": 0, "product_name": 1, "price": 1, "category": 1})
+
             product = ProductDetails.objects(product_id=product_id).first()
             price = product.price
 
@@ -72,7 +70,7 @@ class CartService:
             conn.commit()
 
             filter = {"product_id": product_id}
-            update = {"$set": {"stock_quantity": quantity}}
+            update = {"$set": {"stock_quantity": -temp_quantity}}
 
             result = products_coll.update_one(filter, update)
             if not result.matched_count:  # Rollback if no matching product found
@@ -98,7 +96,7 @@ class CartService:
                 event_type="add_to_cart",
                 details=cart_details
             )
-            #kafka_producer_util.send_event(cart_event)
+            kafka_producer_util.send_event(cart_event)
 
             return {"success": True, "cart_id": cart_id}
 
@@ -172,7 +170,7 @@ class CartService:
                     event_type="update_cart",
                     details=cart_details
                 )
-                #kafka_producer_util.send_event(cart_event)
+                kafka_producer_util.send_event(cart_event)
             
             return {"success": True}
 
@@ -296,7 +294,7 @@ class CartService:
                     event_type="remove_from_cart",
                     details=cart_details
                 )
-                #kafka_producer_util.send_event(cart_event)
+                kafka_producer_util.send_event(cart_event)
             
             return {"success": True}
 
@@ -371,7 +369,7 @@ class CartService:
                         event_type="cart_item_removed",
                         details=cart_details
                     )
-                    #kafka_producer_util.send_event(cart_event)
+                    kafka_producer_util.send_event(cart_event)
                 
                 # Send a cart cleared summary event
                 cart_cleared_event = kafka_producer_util.format_interaction_event(
@@ -385,7 +383,7 @@ class CartService:
                         "reason": "order_placed"
                     }
                 )
-                #kafka_producer_util.send_event(cart_cleared_event)
+                kafka_producer_util.send_event(cart_cleared_event)
                 
             return {"success": True}
 

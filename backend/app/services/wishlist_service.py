@@ -63,7 +63,7 @@ class WishlistService:
                     event_type="add_to_wishlist",
                     details=wishlist_details
                 )
-                #kafka_producer_util.send_event(wishlist_event)
+                kafka_producer_util.send_event(wishlist_event)
 
                 conn.commit()
                 return {"success": True, "wishlist_id": wishlist_id}
@@ -167,7 +167,7 @@ class WishlistService:
                     details=wishlist_details
                 )
 
-                #kafka_producer_util.send_event(wishlist_event)
+                kafka_producer_util.send_event(wishlist_event)
 
                 conn.commit()
 
@@ -260,7 +260,7 @@ class WishlistService:
                         event_type="wishlist_item_removed",
                         details=wishlist_details
                     )
-                    #kafka_producer_util.send_event(wishlist_event)
+                    kafka_producer_util.send_event(wishlist_event)
 
                 # Send a wishlist cleared summary event
                 wishlist_cleared_event = kafka_producer_util.format_interaction_event(
@@ -273,7 +273,7 @@ class WishlistService:
                         "action_date": datetime.utcnow().strftime("%Y-%m-%d")
                     }
                 )
-                #kafka_producer_util.send_event(wishlist_cleared_event)
+                kafka_producer_util.send_event(wishlist_cleared_event)
 
                 conn.commit()
                 return {"success": True}

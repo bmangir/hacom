@@ -63,7 +63,7 @@ class ItemRecommendationService:
                 return cached_items
 
             # If not in cache, get from MongoDB
-            items = IBCF.objects(product_id=product_id, recommendation_type="bought_together").limit(5)
+            items = IBCF.objects(product_id=product_id, source="bought_together").limit(5)
             ids = []
             for item in items:
                 ids += item.recc_items  # Using recc_items field instead of bought_together
