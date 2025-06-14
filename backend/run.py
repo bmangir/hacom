@@ -6,12 +6,25 @@ import sys
 import time
 from flask_cors import CORS
 
+# Optimize TensorFlow and other ML libraries memory usage
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TF logs completely
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'  # Disable oneDNN optimizations to save memory
+
 # Add the backend directory to the Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 backend_dir = os.path.dirname(current_dir)
 sys.path.append(backend_dir)
 
-from databases.postgres.neon_postgres_connector import NeonPostgresConnector
+# Lazy import heavy dependencies only when needed
+def get_tracking_service():
+    from backend.app.services.service_locator import tracking_service
+    return tracking_service
+
+try:
+    from databases.postgres.neon_postgres_connector import NeonPostgresConnector
+    NeonPostgresConnector.initialize_connection_pool()
+except Exception as e:
+    print(f"Error initializing connections: {e}")
 
 from backend.app.controllers.user_controller import user_blueprint
 from backend.app.controllers.product_controller import product_controller_blueprint
@@ -21,15 +34,7 @@ from backend.app.controllers.order_controller import order_bp
 from backend.redis_app.controllers.redis_controller import redis_main_controller_blueprint
 from backend.app.controllers.main_controller import main_controller_blueprint
 from backend.app.controllers.review_controller import review_bp
-from backend.app.services.service_locator import tracking_service
 from backend.config import JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-
-try:
-    NeonPostgresConnector.initialize_connection_pool()
-except Exception as e:
-    print(f"Error initializing connections: {e}")
 
 def create_app():
     app = Flask(__name__,
@@ -64,7 +69,8 @@ def create_app():
             current_time = time.time()
             last_page_time = session.get('last_page_time')
 
-            # Use the global tracking_service
+            # Use lazy loading for tracking service
+            tracking_service = get_tracking_service()
             tracking_service.track_browsing_history(
                 user_id=session['user_id'],
                 session_id=session.get('session_id'),
@@ -95,4 +101,4 @@ app = create_app()
 if __name__ == '__main__':
     # Get port from environment variable or default to 10000 (Render.com uses PORT env variable)
     port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
