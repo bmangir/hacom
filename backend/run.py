@@ -1,43 +1,61 @@
+import os
+import sys
+
+# Add the project root directory to Python path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+
 from flask import Flask, send_from_directory, session, request
 from flask_jwt_extended import JWTManager
 from datetime import timedelta
-import os
-import sys
 import time
 from flask_cors import CORS
 
-# Add the backend directory to the Python path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-backend_dir = os.path.dirname(current_dir)
-sys.path.append(backend_dir)
-
+from databases.mongo.mongo_connector import MongoConnector
 from databases.postgres.neon_postgres_connector import NeonPostgresConnector
-
 from backend.app.controllers.user_controller import user_blueprint
+from backend.app.controllers.main_controller import main_controller_blueprint
 from backend.app.controllers.product_controller import product_controller_blueprint
-from backend.app.controllers.merchant_controller import merchant_controller_blueprint
 from backend.app.controllers.cart_wishlist_controller import cart_wishlist_controller_blueprint
 from backend.app.controllers.order_controller import order_bp
-from backend.redis_app.controllers.redis_controller import redis_main_controller_blueprint
-from backend.app.controllers.main_controller import main_controller_blueprint
 from backend.app.controllers.review_controller import review_bp
+from backend.redis_app.controllers.redis_controller import redis_main_controller_blueprint
 from backend.app.services.service_locator import tracking_service
-from backend.config import JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES
+# Add parent directory to Python path to allow imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add the app directory to the Python path
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'app'))
+
+from databases.mongo.mongo_connector import MongoConnector
+from databases.postgres.neon_postgres_connector import NeonPostgresConnector
+from app.controllers.user_controller import user_blueprint
+from app.controllers.main_controller import main_controller_blueprint
+from app.controllers.product_controller import product_controller_blueprint
+from app.controllers.cart_wishlist_controller import cart_wishlist_controller_blueprint
+from app.controllers.order_controller import order_bp
+from app.controllers.review_controller import review_bp
+from redis_app.controllers.redis_controller import redis_main_controller_blueprint
+from app.services.service_locator import tracking_service
+from config import JWT_SECRET_KEY, JWT_ACCESS_TOKEN_EXPIRES
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
+# Initialize database connections
 try:
     NeonPostgresConnector.initialize_connection_pool()
+    print("Database connections initialized successfully")
 except Exception as e:
-    print(f"Error initializing connections: {e}")
+    print(f"Error initializing database connections: {e}")
 
 def create_app():
     app = Flask(__name__,
                 static_folder='../frontend/static',
                 template_folder='../frontend/templates')
 
-    # Rest of your configuration
+    # Flask session configuration
     app.secret_key = JWT_SECRET_KEY
+
+    # JWT Configuration
     app.config['JWT_SECRET_KEY'] = JWT_SECRET_KEY
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(seconds=int(JWT_ACCESS_TOKEN_EXPIRES))
 
@@ -51,7 +69,6 @@ def create_app():
     app.register_blueprint(user_blueprint)
     app.register_blueprint(main_controller_blueprint)
     app.register_blueprint(product_controller_blueprint)
-    #app.register_blueprint(merchant_controller_blueprint)
     app.register_blueprint(cart_wishlist_controller_blueprint)
     app.register_blueprint(order_bp)
     app.register_blueprint(review_bp)
@@ -64,7 +81,6 @@ def create_app():
             current_time = time.time()
             last_page_time = session.get('last_page_time')
 
-            # Use the global tracking_service
             tracking_service.track_browsing_history(
                 user_id=session['user_id'],
                 session_id=session.get('session_id'),
@@ -93,6 +109,4 @@ def create_app():
 app = create_app()
 
 if __name__ == '__main__':
-    # Get port from environment variable or default to 10000 (Render.com uses PORT env variable)
-    port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', debug=False)
