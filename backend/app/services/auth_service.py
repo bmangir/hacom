@@ -1,14 +1,15 @@
 import json
-
 import bcrypt
 from datetime import timedelta, datetime
-
+import os
 import requests
 from flask_jwt_extended import create_access_token
-from flask import current_app
 
 from databases.postgres.neon_postgres_connector import NeonPostgresConnector
+from backend.utils.utils import kafka_producer_util
 
+# Get Spark API endpoint from environment variable with fallback
+SPARK_API_ENDPOINT = os.getenv('SPARK_API_ENDPOINT', 'http://127.0.0.1:8081')
 
 class AuthService:
     @staticmethod
@@ -39,6 +40,15 @@ class AuthService:
 
             # Create access token
             access_token = create_access_token(identity=user[0])
+
+            # Send login event to Kafka
+            login_event = kafka_producer_util.format_interaction_event(
+                user_id=user[0],
+                product_id=None,
+                event_type="login",
+                details={}
+            )
+            kafka_producer_util.send_event(login_event)
 
             return {
                 "user_id": user[0],
@@ -125,6 +135,15 @@ class AuthService:
 
             # Create access token
             access_token = create_access_token(identity=user_id)
+
+            # Send register event to Kafka
+            register_event = kafka_producer_util.format_interaction_event(
+                user_id=user_id,
+                product_id=None,
+                event_type="register",
+                details={}
+            )
+            kafka_producer_util.send_event(register_event)
 
             return {
                 "user_id": user_id,
