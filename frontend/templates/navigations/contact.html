@@ -121,18 +121,57 @@
             background: rgba(0, 0, 0, 0.6);
             padding: 50px;
             border-radius: 10px;
-            max-width: 800px;
+            max-width: 1200px;
+            margin: 20px;
         }
 
-        .content-container h2 {
-            font-size: 2.5em;
+        .contact-info {
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .project-info-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 40px;
+            text-align: left;
+        }
+
+        .project-info, .key-features {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 25px;
+            border-radius: 8px;
+        }
+
+        .project-info h3, .key-features h3 {
+            color: #00C4FF;
             margin-bottom: 20px;
+            text-align: center;
         }
 
-        .content-container p {
-            font-size: 1.1em;
+        .project-info p, .key-features li {
             margin-bottom: 15px;
-            color: #fff;
+            line-height: 1.6;
+        }
+
+        .key-features ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .key-features li {
+            margin-bottom: 20px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .key-features li:before {
+            content: "•";
+            color: #00C4FF;
+            position: absolute;
+            left: 0;
         }
 
         .content-container a {
@@ -145,6 +184,35 @@
         .content-container a:hover {
             color: #fff;
             text-decoration: underline;
+        }
+
+        .project-info ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .project-info li, .key-features li {
+            margin-bottom: 20px;
+            padding-left: 20px;
+            position: relative;
+            line-height: 1.6;
+        }
+
+        .project-info li:before, .key-features li:before {
+            content: "•";
+            color: #00C4FF;
+            position: absolute;
+            left: 0;
+        }
+
+        @media (max-width: 768px) {
+            .project-info-container {
+                flex-direction: column;
+            }
+            .content-container {
+                margin: 10px;
+                padding: 20px;
+            }
         }
     </style>
 </head>
@@ -161,11 +229,39 @@
 </header>
 
 <div class="content-container">
-  <h2>Contact Us</h2>
-  <p>Email us at:</p>
-  <p><a href="mailto:berkantmangir303@gmail.com">yourname@example.com</a></p>
-  <p>Or call us at:</p>
-  <p><a href="tel:+123456789">+123 456 789</a></p>
+    <div class="contact-info">
+        <h2>Contact Us</h2>
+        <p>For any questions or inquiries about the HACOM project, please feel free to contact:</p>
+        <p><strong>Developer:</strong> Berkant Mangir</p>
+        <p><strong>Email:</strong> <a href="mailto:berkantmangir23@gmail.com">berkantmangir23@gmail.com</a></p>
+        <p><strong>GitHub Repository:</strong> <a href="https://github.com/bmangir/hacom" target="_blank">github.com/bmangir/hacom</a></p>
+    </div>
+
+    <div class="project-info-container">
+        <div class="project-info">
+            <h3>About HACOM Project</h3>
+            <p>HACOM is a graduation project that focuses on real-time data processing and analysis for e-commerce recommendations. The project combines modern technologies including:</p>
+            <ul>
+                <li>Apache Spark for data processing</li>
+                <li>Kafka for real-time data streaming</li>
+                <li>Redis for caching and real-time data storage</li>
+                <li>Flask for backend services</li>
+                <li>Modern web technologies for frontend</li>
+                <li>Gemini for enhanced search capabilities</li>
+            </ul>
+        </div>
+
+        <div class="key-features">
+            <h3>Key Features</h3>
+            <ul>
+                <li>Smart Product Recommendations: Get personalized product suggestions based on your shopping behavior and preferences</li>
+                <li>Real-time Updates: Recommendations update instantly as you browse and shop</li>
+                <li>Intelligent Search: Find products easily with our advanced search system that understands what you're looking for</li>
+                <li>Multiple Recommendation Types: Discover products through various methods like similar items, popular choices, and personalized picks</li>
+                <li>Fast and Reliable: Enjoy quick response times and smooth shopping experience</li>
+            </ul>
+        </div>
+    </div>
 </div>
 
 </body>
