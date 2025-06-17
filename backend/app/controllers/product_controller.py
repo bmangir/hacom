@@ -1,3 +1,5 @@
+from concurrent.futures.thread import ThreadPoolExecutor
+
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for
 from . import login_required
 from ..services.service_locator import ITEM_RECOMMENDATION_SERVICE, tracking_service, wishlist_service, \
@@ -42,16 +44,27 @@ def display_details(product_id):
         total_reviews = len(all_reviews)
 
         # Get similar products and category-based recommendations
-        ibcf_similar_products = ITEM_RECOMMENDATION_SERVICE.get_ibcf_recommendations(product_id)  # Primary model
-        category_products = ITEM_RECOMMENDATION_SERVICE.get_top_n_product_based_on_category(item_id=product_id, category=product['category'])
-        similar_users_liked_products = ITEM_RECOMMENDATION_SERVICE.get_reviewed_based_items()
-        content_based_recommended_products = USER_RECOMMENDATION_SERVICE.get_content_based_recommendations(user_id=session["user_id"], num_recommendations=5)
-        bought_together = ITEM_RECOMMENDATION_SERVICE.get_bought_together_items(product_id)
-        
-        # Get additional recommendations
-        new_arrivals = ITEM_RECOMMENDATION_SERVICE.get_new_arrivals_items()
-        best_sellers = ITEM_RECOMMENDATION_SERVICE.get_best_seller_items()
-        seasonal_items = ITEM_RECOMMENDATION_SERVICE.get_seasonal_recommended_items()
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            ibcf_future = executor.submit(ITEM_RECOMMENDATION_SERVICE.get_ibcf_recommendations, product_id)
+            category_future = executor.submit(ITEM_RECOMMENDATION_SERVICE.get_top_n_product_based_on_category, item_id=product_id, category=product['category'])
+            similar_users_future = executor.submit(ITEM_RECOMMENDATION_SERVICE.get_reviewed_based_items)
+            content_based_future = executor.submit(USER_RECOMMENDATION_SERVICE.get_personalized_trendings, user_id=session["user_id"], num_recommendations=5)
+            bought_together_future = executor.submit(ITEM_RECOMMENDATION_SERVICE.get_bought_together_items, product_id)
+
+            ibcf_similar_products = ibcf_future.result()
+            category_products = category_future.result()
+            similar_users_liked_products = similar_users_future.result()
+            content_based_recommended_products = content_based_future.result()
+            bought_together = bought_together_future.result()
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            new_arrivals_future = executor.submit(ITEM_RECOMMENDATION_SERVICE.get_new_arrivals_items)
+            best_sellers_future = executor.submit(ITEM_RECOMMENDATION_SERVICE.get_best_seller_items)
+            seasonal_items_future = executor.submit(ITEM_RECOMMENDATION_SERVICE.get_seasonal_recommended_items)
+
+            new_arrivals = new_arrivals_future.result()
+            best_sellers = best_sellers_future.result()
+            seasonal_items = seasonal_items_future.result()
 
         return render_template(
             "product_details.html",
