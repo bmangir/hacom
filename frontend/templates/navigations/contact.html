@@ -121,97 +121,70 @@
             background: rgba(0, 0, 0, 0.6);
             padding: 50px;
             border-radius: 10px;
-            max-width: 1200px;
+            max-width: 800px;
             margin: 20px;
         }
 
         .contact-info {
-            margin-bottom: 40px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            margin-bottom: 30px;
         }
 
-        .project-info-container {
-            display: flex;
-            justify-content: space-between;
-            gap: 40px;
-            text-align: left;
-        }
-
-        .project-info, .key-features {
-            flex: 1;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 25px;
-            border-radius: 8px;
-        }
-
-        .project-info h3, .key-features h3 {
+        .contact-info h2 {
+            font-size: 2.5em;
+            margin-bottom: 30px;
             color: #00C4FF;
-            margin-bottom: 20px;
-            text-align: center;
         }
 
-        .project-info p, .key-features li {
-            margin-bottom: 15px;
+        .contact-info p {
+            font-size: 1.1em;
             line-height: 1.6;
+            margin-bottom: 15px;
         }
 
-        .key-features ul {
-            list-style: none;
-            padding: 0;
-        }
-
-        .key-features li {
-            margin-bottom: 20px;
-            padding-left: 20px;
-            position: relative;
-        }
-
-        .key-features li:before {
-            content: "•";
-            color: #00C4FF;
-            position: absolute;
-            left: 0;
-        }
-
-        .content-container a {
+        .contact-info a {
             color: #00C4FF;
             text-decoration: none;
             font-weight: bold;
             transition: color 0.3s ease;
         }
 
-        .content-container a:hover {
+        .contact-info a:hover {
             color: #fff;
             text-decoration: underline;
         }
 
-        .project-info ul {
-            list-style: none;
-            padding: 0;
+        .contact-details {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            border-radius: 10px;
+            margin-top: 20px;
         }
 
-        .project-info li, .key-features li {
+        .contact-item {
             margin-bottom: 20px;
-            padding-left: 20px;
-            position: relative;
-            line-height: 1.6;
+            padding: 15px;
+            background: rgba(0, 196, 255, 0.1);
+            border-radius: 8px;
+            border-left: 4px solid #00C4FF;
         }
 
-        .project-info li:before, .key-features li:before {
-            content: "•";
-            color: #00C4FF;
-            position: absolute;
-            left: 0;
+        .contact-item:last-child {
+            margin-bottom: 0;
         }
 
         @media (max-width: 768px) {
-            .project-info-container {
-                flex-direction: column;
-            }
             .content-container {
                 margin: 10px;
                 padding: 20px;
+            }
+            header {
+                padding: 20px 20px;
+            }
+            .logo {
+                font-size: 2.5em;
+            }
+            .navigation a {
+                margin-left: 20px;
             }
         }
     </style>
@@ -232,35 +205,29 @@
     <div class="contact-info">
         <h2>Contact Us</h2>
         <p>For any questions or inquiries about the HACOM project, please feel free to contact:</p>
-        <p><strong>Developer:</strong> Berkant Mangir</p>
-        <p><strong>Email:</strong> <a href="mailto:berkantmangir23@gmail.com">berkantmangir23@gmail.com</a></p>
-        <p><strong>GitHub Repository:</strong> <a href="https://github.com/bmangir/hacom" target="_blank">github.com/bmangir/hacom</a></p>
-    </div>
+        
+        <div class="contact-details">
+            <div class="contact-item">
+                <p><strong>Developer:</strong> Berkant Mangir</p>
+            </div>
+            
+            <div class="contact-item">
+                <p><strong>Email:</strong> <a href="mailto:berkantmangir23@gmail.com">berkantmangir23@gmail.com</a></p>
+            </div>
+            
+            <div class="contact-item">
+                <p><strong>GitHub Repository:</strong> <a href="https://github.com/bmangir/hacom" target="_blank">github.com/bmangir/hacom</a></p>
+            </div>
 
-    <div class="project-info-container">
-        <div class="project-info">
-            <h3>About HACOM Project</h3>
-            <p>HACOM is a graduation project that focuses on real-time data processing and analysis for e-commerce recommendations. The project combines modern technologies including:</p>
-            <ul>
-                <li>Apache Spark for data processing</li>
-                <li>Kafka for real-time data streaming</li>
-                <li>Redis for caching and real-time data storage</li>
-                <li>Flask for backend services</li>
-                <li>Modern web technologies for frontend</li>
-                <li>Gemini for enhanced search capabilities</li>
-            </ul>
+            <div class="contact-item">
+                <p><strong>Academic Advisor:</strong> Assoc. Prof. Dr. Murat Aydos</p>
+                <p><strong>Department:</strong> Computer Engineering</p>
+            </div>
         </div>
-
-        <div class="key-features">
-            <h3>Key Features</h3>
-            <ul>
-                <li>Smart Product Recommendations: Get personalized product suggestions based on your shopping behavior and preferences</li>
-                <li>Real-time Updates: Recommendations update instantly as you browse and shop</li>
-                <li>Intelligent Search: Find products easily with our advanced search system that understands what you're looking for</li>
-                <li>Multiple Recommendation Types: Discover products through various methods like similar items, popular choices, and personalized picks</li>
-                <li>Fast and Reliable: Enjoy quick response times and smooth shopping experience</li>
-            </ul>
-        </div>
+        
+        <p style="margin-top: 30px; font-style: italic;">
+            We welcome any feedback, questions, or collaboration opportunities related to this real-time recommendation system project.
+        </p>
     </div>
 </div>
 

@@ -21,6 +21,7 @@
             background-size: cover;
             background-position: center;
             position: relative;
+            padding: 120px 20px 20px;
         }
 
         body::before {
@@ -114,24 +115,176 @@
 
         .content-container {
             color: #fff;
-            text-align: center;
             z-index: 2;
             position: relative;
             background: rgba(0, 0, 0, 0.6);
             padding: 50px;
             border-radius: 10px;
-            max-width: 800px;
+            max-width: 1200px;
+            margin: 20px auto;
         }
 
-        .content-container h2 {
+        .section {
+            margin-bottom: 40px;
+            padding: 30px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+        }
+
+        .section h2 {
             font-size: 2.5em;
             margin-bottom: 20px;
+            text-align: center;
+            color: #00C4FF;
         }
 
-        .content-container p {
+        .section h3 {
+            color: #00C4FF;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+
+        .section p {
             font-size: 1.1em;
             line-height: 1.6;
             margin-bottom: 15px;
+        }
+
+        .project-info-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        .project-info, .key-features {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 25px;
+            border-radius: 8px;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            margin-bottom: 15px;
+            padding-left: 20px;
+            position: relative;
+            line-height: 1.6;
+        }
+
+        li:before {
+            content: "•";
+            color: #00C4FF;
+            position: absolute;
+            left: 0;
+            font-weight: bold;
+        }
+
+        .performance-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .performance-table th,
+        .performance-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .performance-table th {
+            background: rgba(0, 196, 255, 0.2);
+            color: #00C4FF;
+            font-weight: 600;
+        }
+
+        .team-info {
+            text-align: center;
+            background: rgba(0, 196, 255, 0.1);
+            padding: 25px;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 196, 255, 0.3);
+        }
+
+        .contact-info {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .contact-info a {
+            color: #00C4FF;
+            text-decoration: none;
+            font-weight: bold;
+            transition: color 0.3s ease;
+        }
+
+        .contact-info a:hover {
+            color: #fff;
+            text-decoration: underline;
+        }
+
+        .architecture-images {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .architecture-images img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 196, 255, 0.3);
+            margin: 15px 0;
+            transition: transform 0.3s ease;
+        }
+
+        .architecture-images img:hover {
+            transform: scale(1.02);
+        }
+
+        .architecture-description {
+            font-style: italic;
+            color: #00C4FF;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+
+        .poster-section {
+            text-align: center;
+            background: rgba(0, 196, 255, 0.05);
+            padding: 30px;
+            border-radius: 10px;
+            border: 1px solid rgba(0, 196, 255, 0.2);
+        }
+
+        .poster-section img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 10px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        @media (max-width: 768px) {
+            .project-info-container {
+                flex-direction: column;
+            }
+            .content-container {
+                margin: 10px;
+                padding: 20px;
+            }
+            header {
+                padding: 20px 20px;
+            }
+            .logo {
+                font-size: 2.5em;
+            }
+            .navigation a {
+                margin-left: 20px;
+            }
         }
     </style>
 </head>
@@ -148,15 +301,183 @@
     </header>
 
     <div class="content-container">
-        <h2>About Us</h2>
-        <p>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer in augue neque. 
-            Praesent tincidunt arcu id metus convallis, in sodales nisi interdum.
-        </p>
-        <p>
-            Vivamus a ligula ut odio ultrices consectetur sit amet id nulla. 
-            Curabitur et quam eget purus suscipit egestas.
-        </p>
+        <!-- Project Overview Section -->
+        <div class="section">
+            <h2>🧠 Real-Time Personalized Recommendation System for E-commerce</h2>
+            <p>
+                This project aims to enhance user experience and boost sales in e-commerce platforms by providing personalized product recommendations using both batch-time and real-time processing. By analyzing user behavior—including browsing, purchasing, and wishlist activity—the system intelligently suggests products users are likely to buy, even before they search for them.
+            </p>
+            <p style="text-align: center; font-style: italic; font-size: 1.2em; color: #00C4FF;">
+                <strong>"AI that knows what you want."</strong>
+            </p>
+        </div>
+
+        <!-- About Project and Key Features -->
+        <div class="project-info-container">
+            <div class="project-info">
+                <h3>About HACOM Project</h3>
+                <p>HACOM is a graduation project that focuses on real-time data processing and analysis for e-commerce recommendations. The project combines modern technologies including:</p>
+                <ul>
+                    <li>Apache Spark for data processing</li>
+                    <li>Kafka for real-time data streaming</li>
+                    <li>Redis for caching and real-time data storage</li>
+                    <li>Flask for backend services</li>
+                    <li>Modern web technologies for frontend</li>
+                    <li>Gemini for enhanced search capabilities</li>
+                </ul>
+            </div>
+
+            <div class="key-features">
+                <h3>Key Features</h3>
+                <ul>
+                    <li>Smart Product Recommendations: Get personalized product suggestions based on your shopping behavior and preferences</li>
+                    <li>Real-time Updates: Recommendations update instantly as you browse and shop</li>
+                    <li>Intelligent Search: Find products easily with our advanced search system that understands what you're looking for</li>
+                    <li>Multiple Recommendation Types: Discover products through various methods like similar items, popular choices, and personalized picks</li>
+                    <li>Fast and Reliable: Enjoy quick response times and smooth shopping experience</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Technical Features Section -->
+        <div class="section">
+            <h3>🚀 System Capabilities</h3>
+            <ul>
+                <li><strong>Real-Time & Batch Recommendations:</strong> Combines real-time streaming with nightly batch processing to provide up-to-date suggestions</li>
+                <li><strong>Hybrid Recommendation Models:</strong>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li>User-based Collaborative Filtering (UBCF)</li>
+                        <li>Item-based Collaborative Filtering (IBCF)</li>
+                        <li>Content-based Filtering</li>
+                        <li>Heuristic models (Trending, Reviewed, Bought Together, etc.)</li>
+                    </ul>
+                </li>
+                <li><strong>Gemini-Powered Search Interface:</strong> The search experience is enhanced with Google's Gemini model, offering smarter and more context-aware product search results</li>
+                <li><strong>Improved Click-Through Rate:</strong> CTR improved by up to 40% with real-time suggestions in &lt; 2 seconds</li>
+                <li><strong>High Performance & Scalability:</strong> 84.6 req/sec, Average response: 13ms, Redis caching (99.9% hit rate)</li>
+            </ul>
+        </div>
+
+        <!-- System Architecture Section -->
+        <div class="section">
+            <h3>🧱 System Architecture</h3>
+            
+            <div class="architecture-images">
+                <img src="{{ url_for('static', filename='images/real-time-arch.png') }}" alt="Real-time System Architecture">
+                <p class="architecture-description">
+                    GCP Dataproc (Apache Spark) handles batch jobs. Kafka + Spark Streaming handles real-time data every 3 minutes. 
+                    Recommendations are cached in Redis and fetched via Flask API. Gemini enhances semantic understanding of search queries.
+                </p>
+            </div>
+
+            <div class="architecture-images">
+                <img src="{{ url_for('static', filename='images/batch-arch.png') }}" alt="Batch Architecture">
+                <p class="architecture-description">
+                    Batch processing runs nightly on GCP Dataproc to update recommendation models and generate new suggestions.
+                    Data is processed using Apache Spark and stored in MongoDB for quick retrieval. 
+                    Batch jobs handle heavy computations like matrix factorization and model training.
+                </p>
+            </div>
+        </div>
+
+        <!-- Technologies Section -->
+        <div class="section">
+            <h3>🛠 Technologies Used</h3>
+            <ul>
+                <li><strong>Backend:</strong> Python (Flask), MongoDB, PostgreSQL, Redis, Pinecone</li>
+                <li><strong>Frontend:</strong> HTML/CSS + JS (Render.com hosted)</li>
+                <li><strong>Search Engine:</strong> Gemini (semantic product search)</li>
+                <li><strong>Streaming & Batch Processing:</strong> Apache Spark (PySpark), Kafka, GCP Dataproc</li>
+                <li><strong>Monitoring:</strong> Prometheus, Apache JMeter</li>
+                <li><strong>Deployment:</strong> GCP, Render</li>
+            </ul>
+        </div>
+
+        <!-- Performance Metrics Section -->
+        <div class="section">
+            <h3>📊 Performance & Scalability Metrics</h3>
+            <table class="performance-table">
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Avg Throughput</td>
+                        <td>84.6 req/sec</td>
+                    </tr>
+                    <tr>
+                        <td>Avg Response Time</td>
+                        <td>13 ms</td>
+                    </tr>
+                    <tr>
+                        <td>Cache Hit Rate (Redis)</td>
+                        <td>99.9%</td>
+                    </tr>
+                    <tr>
+                        <td>Concurrent Users Tested</td>
+                        <td>500+</td>
+                    </tr>
+                    <tr>
+                        <td>Error Rate</td>
+                        <td>0%</td>
+                    </tr>
+                    <tr>
+                        <td>Uptime</td>
+                        <td>100% (during load tests)</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="text-align: center; color: #00C4FF; font-weight: bold;">
+                🔄 Latency &lt; 5ms for 99.5% of requests
+            </p>
+        </div>
+
+        <!-- Data Sources Section -->
+        <div class="section">
+            <h3>📊 Data Sources</h3>
+            <ul>
+                <li>Clickstream (browsing behavior)</li>
+                <li>Orders & Cart additions</li>
+                <li>Wishlists</li>
+                <li>Product reviews</li>
+                <li>Synthetic dataset enriched via scraping & simulated APIs</li>
+            </ul>
+        </div>
+
+        <!-- Future Improvements Section -->
+        <div class="section">
+            <h3>📈 Future Improvements</h3>
+            <ul>
+                <li>Integrate HDFS for scalable clickstream storage</li>
+                <li>Enhance data quality with richer behavioral signals (e.g., dwell time, scroll depth)</li>
+                <li>Add deep learning models (e.g., Neural Collaborative Filtering, Transformers)</li>
+                <li>Implement A/B testing and feedback loops for continuous learning</li>
+                <li>Improve cold-start strategies for new users/products</li>
+            </ul>
+        </div>
+
+        <!-- Project Poster Section -->
+        <div class="poster-section">
+            <h3>🖼 Project Poster</h3>
+            <p style="margin-bottom: 20px;">Here is a visual summary of the project:</p>
+            <img src="{{ url_for('static', filename='images/poster.png') }}" alt="HACOM Project Poster">
+        </div>
+
+        <!-- Team Information Section -->
+        <div class="team-info">
+            <h3>🧑‍💻 Project Team</h3>
+            <p><strong>Berkant Mangır</strong></p>
+            <p>Advisor: Assoc. Prof. Dr. Murat Aydos</p>
+            <p>Department of Computer Engineering</p>
+            
+            <div class="contact-info">
+                <p><strong>Contact:</strong> <a href="mailto:berkantmangir23@gmail.com">berkantmangir23@gmail.com</a></p>
+                <p><strong>GitHub Repository:</strong> <a href="https://github.com/bmangir/hacom" target="_blank">github.com/bmangir/hacom</a></p>
+            </div>
+        </div>
     </div>
 </body>
 </html>
