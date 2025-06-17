@@ -119,22 +119,22 @@ class AuthService:
                 "age": int((datetime.now() - birthdate_obj).days / 365),
                 "location": address
             }
-
-            # Only commit to database if the API call succeeds
-            try:
-                response = requests.post(url="http://127.0.0.1:8081/api/v1/stream/new_registration_computer", json=user_json)
-                if response.status_code != 200:
-                    conn.rollback()
-                    return None, "Failed to send registration data to the streaming service"
-            except requests.RequestException:
-                conn.rollback()
-                return None, "Failed to connect to the streaming service"
             
             # If we get here, everything succeeded - commit the transaction
             conn.commit()
 
             # Create access token
             access_token = create_access_token(identity=user_id)
+
+            # Only commit to database if the API call succeeds
+            try:
+                response = requests.post(url="http://127.0.0.1:8081/api/v1/stream/new_registration_computer", json=user_json)
+                if response.status_code != 200:
+                    conn.rollback()
+                    print("Failed to get cold start recommendations from Spark API, rolling back transaction. Response: ", response.text)
+            except requests.RequestException:
+                conn.rollback()
+                print("Failed to connect to Spark API, rolling back transaction.")
 
             # Send register event to Kafka
             register_event = kafka_producer_util.format_interaction_event(
