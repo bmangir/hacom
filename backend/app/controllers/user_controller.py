@@ -143,7 +143,7 @@ def logout():
     try:
         # End the session
         if 'session_id' in session:
-            session_service.end_session(session['session_id'])
+            session_service.end_session(session["user_id"], session['session_id'])
 
         current_time = time.time()
         last_page_time = session.get('last_page_time')
