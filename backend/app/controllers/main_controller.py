@@ -1,3 +1,5 @@
+from concurrent.futures import ThreadPoolExecutor
+
 from flask import request, Blueprint, url_for, render_template, jsonify, session, redirect
 
 from backend.app.services.service_locator import USER_RECOMMENDATION_SERVICE, tracking_service, \
@@ -31,13 +33,20 @@ def home():
         cb_recommended_products = []
         if user_id:
             try:
-                ubcf_recommended_products = USER_RECOMMENDATION_SERVICE.get_ubcf_recommendations(user_id=user_id, num_recommendations=10)
-                cb_recommended_products = USER_RECOMMENDATION_SERVICE.get_content_based_recommendations(user_id=user_id, num_recommendations=5)
-                most_visited_categories = USER_RECOMMENDATION_SERVICE.get_most_visited_categories(user_id=user_id)
+                with ThreadPoolExecutor(max_workers=3) as executor:
+                    # Fetch recommendations concurrently
+                    ubcf_future = executor.submit(USER_RECOMMENDATION_SERVICE.get_ubcf_recommendations, user_id=user_id, num_recommendations=10)
+                    cb_future = executor.submit(USER_RECOMMENDATION_SERVICE.get_content_based_recommendations, user_id=user_id, num_recommendations=5)
+                    categories_future = executor.submit(USER_RECOMMENDATION_SERVICE.get_most_visited_categories, user_id=user_id)
+
+                    # Get results from futures
+                    ubcf_recommended_products = ubcf_future.result()
+                    cb_recommended_products = cb_future.result()
+                    most_visited_categories = categories_future.result()
 
                 # If no items found, get trending items
                 if len(cb_recommended_products) == 0:
-                    cb_recommended_products = ITEM_RECOMMENDATION_SERVICE.get_trending_items(user_id)
+                    cb_recommended_products = ITEM_RECOMMENDATION_SERVICE.get_trending_items(15)
 
                 if len(most_visited_categories) == 0:
                     most_visited_categories = ITEM_RECOMMENDATION_SERVICE.get_trending_categories(user_id)
@@ -48,6 +57,6 @@ def home():
             "logged_page.html",
             recommended_products=ubcf_recommended_products,
             most_visited_categories=most_visited_categories,
-            content_based_reccommendations=cb_recommended_products
+            content_based_recommendations=cb_recommended_products
         )
     return render_template("main.html")
