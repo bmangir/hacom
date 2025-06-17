@@ -12,15 +12,42 @@ class ItemRecommendationService:
     def __init__(self, mongo_db, cache):
         self.db = mongo_db
         self.cache = cache
-        self.content_model = SentenceTransformer("all-MiniLM-L6-v2")
+        # Lazy loading for AI models - only initialize when needed
+        self._content_model = None
+        self._gemini_model = None
         
-        # Initialize Gemini
-        genai.configure(api_key=GEMINI_API_KEY)
-        self.gemini_model = genai.GenerativeModel("gemma-3-1b-it")
+    @property
+    def content_model(self):
+        """Lazy loading for SentenceTransformer model"""
+        if self._content_model is None:
+            try:
+                self._content_model = SentenceTransformer("all-MiniLM-L6-v2")
+            except Exception as e:
+                print(f"Warning: Failed to load SentenceTransformer: {e}")
+                self._content_model = None
+        return self._content_model
+        
+    @property
+    def gemini_model(self):
+        """Lazy loading for Gemini model"""
+        if self._gemini_model is None:
+            try:
+                if GEMINI_API_KEY:
+                    genai.configure(api_key=GEMINI_API_KEY)
+                    self._gemini_model = genai.GenerativeModel("gemma-3-1b-it")
+                else:
+                    print("Warning: GEMINI_API_KEY not found")
+            except Exception as e:
+                print(f"Warning: Failed to initialize Gemini: {e}")
+                self._gemini_model = None
+        return self._gemini_model
 
     def refine_query_with_gemini(self, raw_query: str) -> str:
         """Refine the search query using Gemini AI"""
         try:
+            if not self.gemini_model:
+                return raw_query
+                
             prompt = f"""
                     You are a product search query analyzer. Your task is to transform the raw search query into structured product information.
                     
