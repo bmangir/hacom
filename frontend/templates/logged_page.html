@@ -300,7 +300,7 @@ background-color: #eaf4ff;
 <div class="category-section">
     <h2>Content Based Recommendations</h2>
     <div class="product-grid">
-        {% for product in content_based_reccommendations %}
+        {% for product in content_based_recommendations %}
         <div class="product-card">
             <div class="product-image">
                 <img src="{{ product.image_url }}" alt="{{ product.name }}" onerror="handleProductImageError(this, '{{ product.category }}')" loading="lazy">
