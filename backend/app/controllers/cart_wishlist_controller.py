@@ -236,17 +236,12 @@ def view_wishlist():
         # Update last page time
         session['last_page_time'] = current_time
         
-        wishlist_response = wishlist_service.get_wishlist_items(user_id)  # Get the wishlist items
+        wishlist_response = wishlist_service.get_wishlist_items(user_id)
 
         if not wishlist_response['success']:
             return "Error loading wishlist", 500
 
-        wishlist_items = wishlist_response['items']  # Extract items from the response
-        products = []
-        #for item in wishlist_items:
-        #    product = _get_product_details(item['product_id'])
-        #    if product:
-        #        products.append(product)
+        wishlist_items = wishlist_response['items']
 
         return render_template("wishlist.html", wishlist_items=wishlist_items)
     except Exception as e:
