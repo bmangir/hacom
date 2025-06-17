@@ -32,10 +32,18 @@ JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
 JWT_ACCESS_TOKEN_EXPIRES = os.getenv('JWT_ACCESS_TOKEN_EXPIRES', 3600)
 
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-pc = Pinecone(api_key=PINECONE_API_KEY)
 ITEM_CONTENTS_HOST = os.getenv("ITEM_CONTENTS_HOST")
 ITEM_FEATURES_HOST = os.getenv("ITEM_FEATURES_HOST")
 USER_FEATURES_HOST = os.getenv("USER_FEATURES_HOST")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# Initialize Pinecone only if API key is available
+pc = None
+if PINECONE_API_KEY:
+    try:
+        pc = Pinecone(api_key=PINECONE_API_KEY)
+    except Exception as e:
+        print(f"Warning: Could not initialize Pinecone: {e}")
 
 # Redis Cloud Configuration
 REDIS_HOST = os.getenv("REDIS_HOST")
