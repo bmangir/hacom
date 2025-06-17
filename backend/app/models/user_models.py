@@ -46,7 +46,8 @@ class ContentBased(Document):
 class PersonalizedTrending(Document):
     meta = {
         'db_alias': 'recc_default',
-        'collection': 'personalized'
+        'collection': 'personalized_trending',
+        "strict": False
     }
 
     user_id = StringField(required=True)
