@@ -22,13 +22,42 @@ class ItemRecommendationService:
         """Refine the search query using Gemini AI"""
         try:
             prompt = f"""
-            You are a search optimization assistant.
-            Improve the following search query to be more specific and helpful for finding products:
-
-            Query: "{raw_query}"
-
-            Output only the improved query without extra text.
-            """
+                    You are a product search query analyzer. Your task is to transform the raw search query into structured product information.
+                    
+                    MAIN OBJECTIVES:
+                    1. Extract the exact search query as the Name
+                    2. Determine the most appropriate single Category
+                    3. Generate maximum 2 most relevant Tags based on the query
+                    4. Extract or infer other attributes when present in the query
+                    
+                    FORMAT RULES:
+                    - Use this exact format: Name:value | Category:value | Tags:tag1,tag2 | Brand:value | Material:value | Gender:value | Color:value | Size:value | Price bucket:value | Language:value | Format:value | Details:key1=value1  key2=value2
+                    - Use "None" for attributes not mentioned or not applicable
+                    - Use "Low", "Medium", or "High" for Price bucket
+                    
+                    CATEGORY RULES:
+                    - Must choose ONE category from this list: Clothing, Computers, Mobile Devices, Photography, Audio, Books, Home & Garden, Sports, Beauty, Toys, Accessories
+                    - Do not create new categories
+                    - Choose the most specific and appropriate category
+                    
+                    TAG RULES:
+                    - Generate MAXIMUM 2 tags
+                    - Tags must be directly relevant to the query
+                    - Use lowercase for tags
+                    - Separate multiple tags with comma
+                    
+                    EXAMPLES:
+                    Query: "man pants"
+                    → Name:man pants | Category:Clothing | Tags:menswear,pants | Brand:None | Material:None | Gender:Male | Color:None | Size:None | Price bucket:Medium | Language:None | Format:None | Details:type=pants  gender=male
+                    
+                    Query: "wireless headphones"
+                    → Name:wireless headphones | Category:Audio | Tags:wireless,headphones | Brand:None | Material:None | Gender:None | Color:None | Size:None | Price bucket:Medium | Language:None | Format:None | Details:connectivity=wireless
+                    
+                    Query: "yellow sweat"
+                    → Name: yellow sweat | Category:Clothing | Tags:sportswear,summer,winter | Brand:None | Material:Cotton | Gender:Unisex | Color:Yellow | Size:XS,S,M,L,XL | Price bucket:Low | Language:None | Format:None | Details:type=sweat  color=yellow
+                    
+                    Now analyze this query: "{raw_query}"
+                    """
             response = self.gemini_model.generate_content(prompt)
             return response.text.strip()
         except Exception as e:
@@ -42,7 +71,7 @@ class ItemRecommendationService:
             return cached_items
 
         # If not in cache, get from MongoDB
-        items = IBCF.objects(product_id=product_id).limit(num_recommendations)
+        items = IBCF.objects(product_id=product_id, source__ne="bought_together").limit(num_recommendations)
         recc_items = []
         for item in items:
             recc_items.append(item.recc_items)
@@ -66,7 +95,7 @@ class ItemRecommendationService:
             items = IBCF.objects(product_id=product_id, source="bought_together").limit(5)
             ids = []
             for item in items:
-                ids += item.recc_items  # Using recc_items field instead of bought_together
+                ids.append(item.recc_items)
 
             result = _get_product_details(ids)
 
@@ -141,17 +170,17 @@ class ItemRecommendationService:
 
     def get_trending_items(self, num_recommendations: int = 10):
         # Try to get from cache first
-        cached_items = self.cache.get_item_recommendations("global", "trending")
-        if cached_items:
-            return cached_items
+        #cached_items = self.cache.get_item_recommendations("global", "trending")
+        #if cached_items:
+        #    return cached_items
 
         # If not in cache, get from MongoDB
-        items = Trending.objects().order_by('-trending_score').limit(num_recommendations)
-        recc_items = []
+        items = Trending.objects().order_by('-trending_score').limit(num_recommendations*2)
+        recc_items = set()
         for item in items:
-            recc_items.append(item.product_id)
+            recc_items.add(item.product_id)
 
-        result = _get_product_details(recc_items)
+        result = _get_product_details(list(recc_items))
 
         # Cache the results
         if result:
@@ -180,10 +209,11 @@ class ItemRecommendationService:
 
         return result
 
-    def search(self, query: str, top_k: int = 3):
+    def search(self, query: str, top_k: int = 20):
         try:
             # Refine query using Gemini
             refined_query = self.refine_query_with_gemini(query)
+            print(f"Refined query: {refined_query}")
             
             index = pc.Index(host=ITEM_CONTENTS_HOST)
             query_vector = self.content_model.encode(refined_query).tolist()
